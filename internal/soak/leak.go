@@ -19,6 +19,10 @@ func leakOneBlock() {
 	if p == nil {
 		panic("malloc failed")
 	}
-	// Write to it so it cannot be optimised away, then drop the only pointer.
+	// Write to it so it cannot be optimised away, then clobber the only
+	// pointer. Go's heap and stacks are registered as leak-checker roots, so a
+	// stale copy left behind would make the block count as reachable.
 	*(*byte)(unsafe.Pointer(p)) = 1
+	p = nil
+	_ = p
 }
