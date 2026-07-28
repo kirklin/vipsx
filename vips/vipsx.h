@@ -12,6 +12,12 @@
 #include <string.h>
 #include <vips/vips.h>
 
+// The floor is what CI actually tests against. Older libvips fails to link on
+// missing symbols, which is a worse error than this one.
+#if VIPS_MAJOR_VERSION < 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION < 12)
+#error "vipsx needs libvips 8.12 or newer"
+#endif
+
 // The complete type surface of the libvips operation API. Every argument of
 // every operation is one of these; there is no eighteenth case.
 #define VIPSX_KIND_UNKNOWN 0
