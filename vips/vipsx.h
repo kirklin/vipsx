@@ -148,6 +148,62 @@ void vipsx_image_unref(VipsImage *image);
 int vipsx_image_width(VipsImage *image);
 int vipsx_image_height(VipsImage *image);
 int vipsx_image_bands(VipsImage *image);
+int vipsx_image_format(VipsImage *image);
+int vipsx_image_interpretation(VipsImage *image);
+int vipsx_image_coding(VipsImage *image);
+double vipsx_image_xres(VipsImage *image);
+double vipsx_image_yres(VipsImage *image);
+int vipsx_image_xoffset(VipsImage *image);
+int vipsx_image_yoffset(VipsImage *image);
+int vipsx_image_has_alpha(VipsImage *image);
+
+// Image metadata. These read and write fields on the image header rather than
+// running an operation, so they sit outside vipsx_call.
+char **vipsx_image_fields(VipsImage *image, int *count);
+int vipsx_image_has_field(VipsImage *image, const char *name);
+int vipsx_image_get_kind(VipsImage *image, const char *name);
+int vipsx_image_get_int(VipsImage *image, const char *name, int *out);
+int vipsx_image_get_double(VipsImage *image, const char *name, double *out);
+char *vipsx_image_get_string(VipsImage *image, const char *name);
+char *vipsx_image_get_as_string(VipsImage *image, const char *name);
+void *vipsx_image_get_blob(VipsImage *image, const char *name, size_t *len);
+int vipsx_image_get_array_double(VipsImage *image, const char *name, double **out,
+                                 int *n);
+int vipsx_image_get_array_int(VipsImage *image, const char *name, int **out, int *n);
+void vipsx_image_set_int(VipsImage *image, const char *name, int value);
+void vipsx_image_set_double(VipsImage *image, const char *name, double value);
+void vipsx_image_set_string(VipsImage *image, const char *name, const char *value);
+void vipsx_image_set_blob(VipsImage *image, const char *name, const void *data,
+                          size_t len);
+int vipsx_image_remove(VipsImage *image, const char *name);
+
+// Interpolators, sources and targets are GObjects an operation can take as an
+// argument, so they need constructors of their own.
+VipsInterpolate *vipsx_interpolate_new(const char *nickname);
+VipsSource *vipsx_source_new_from_file(const char *filename);
+VipsSource *vipsx_source_new_from_memory(const void *data, size_t len);
+VipsTarget *vipsx_target_new_to_file(const char *filename);
+VipsTarget *vipsx_target_new_to_memory(void);
+void *vipsx_target_steal(VipsTarget *target, size_t *len);
+void vipsx_object_unref(void *obj);
+
+// Release memory libvips allocated with g_malloc.
+void vipsx_gfree(void *p);
+void vipsx_strv_gfree(char **strv);
+
+// Operation cache. libvips reuses built operations, which is good for
+// throughput but hides leaks, so a leak check turns it off first.
+void vipsx_cache_set_max(int max);
+void vipsx_cache_set_max_mem(size_t bytes);
+int vipsx_cache_get_max(void);
+int vipsx_cache_get_size(void);
+void vipsx_cache_drop_all(void);
+
+// Live allocation counters, for leak checking under load.
+size_t vipsx_tracked_mem(void);
+size_t vipsx_tracked_mem_highwater(void);
+int vipsx_tracked_allocs(void);
+int vipsx_tracked_files(void);
 
 char *vipsx_error_buffer_copy(void);
 
