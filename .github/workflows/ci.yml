@@ -81,10 +81,10 @@ jobs:
         run: go test ./vips/ -race -count=1
 
       - name: Differential test against the vips CLI
-        run: go test ./internal/difftest/ -count=1 -timeout 30m
+        run: go test ./internal/difftest/ -count=1 -timeout 30m -v
 
       - name: Memory soak
-        run: go test ./internal/soak/ -count=1 -timeout 20m
+        run: go test ./internal/soak/ -count=1 -timeout 20m -v
 
   # The generator reads the installed libvips, so its output is different on
   # every version above. What has to hold everywhere is that generation
