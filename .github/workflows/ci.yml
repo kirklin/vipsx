@@ -13,8 +13,11 @@ env:
 jobs:
   # The claim this project makes is that one copy of the code works against
   # whatever libvips is installed. That is only worth believing if it is tested
-  # against several, so the matrix spans three real versions rather than three
+  # against several, so the matrix spans real versions rather than several
   # runners with the same one.
+  #
+  # The floor is tested separately, in a container, because no GitHub runner
+  # ships it. See test-floor below.
   test:
     name: test (${{ matrix.os }}, libvips from ${{ matrix.source }})
     runs-on: ${{ matrix.os }}
@@ -22,8 +25,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            source: apt (8.12)
           - os: ubuntu-24.04
             source: apt (8.15)
           - os: macos-14
@@ -79,6 +80,50 @@ jobs:
 
       - name: Race detector
         run: go test ./vips/ -race -count=1
+
+      - name: Differential test against the vips CLI
+        run: go test ./internal/difftest/ -count=1 -timeout 30m -v
+
+      - name: Memory soak
+        run: go test ./internal/soak/ -count=1 -timeout 20m -v
+
+
+  # The oldest libvips this supports, which is the one that decides whether the
+  # version claim in the README is true. Debian 12 carries 8.14 and is supported
+  # into 2028, so it is the floor worth holding; Ubuntu 22.04 carries 8.12, and
+  # that combination crashes inside libvips during the differential suite with a
+  # stack smash, which is not something this binding can paper over.
+  test-floor:
+    name: test (debian 12, libvips 8.14, the supported floor)
+    runs-on: ubuntu-24.04
+    container: debian:12
+    steps:
+      # Runs before checkout on purpose: the base image has no git, and
+      # actions/checkout would otherwise fall back to a tarball download.
+      - name: Install prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git ca-certificates build-essential pkg-config make \
+            libvips-dev libvips-tools
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Report the libvips actually linked
+        run: |
+          pkg-config --modversion vips
+          vips --version
+
+      - name: Unit tests
+        run: go test ./vips/ -count=1
+
+      - name: Coverage against govips and vipsgen
+        run: go test ./internal/coverage/ -count=1 -v
 
       - name: Differential test against the vips CLI
         run: go test ./internal/difftest/ -count=1 -timeout 30m -v

@@ -27,7 +27,7 @@ func TestVersion(t *testing.T) {
 		t.Fatal("no version reported")
 	}
 	major, minor, _ := vips.VersionParts()
-	if major < 8 || (major == 8 && minor < 12) {
+	if major < 8 || (major == 8 && minor < 14) {
 		t.Fatalf("libvips %d.%d is older than this package supports", major, minor)
 	}
 	t.Logf("linked against libvips %s", vips.Version())
