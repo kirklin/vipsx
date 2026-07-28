@@ -209,6 +209,24 @@ jobs:
       # The same build with leak detection on. The suppression file covers the
       # tables GLib and libvips keep for the life of the process; what is left
       # is this package losing a reference it owns.
+      # Prove the detector detects, before trusting it to say there is nothing.
+      # AddressSanitizer prints nothing when it finds nothing, so a green leak
+      # run and a run with leak detection switched off are indistinguishable.
+      # This one deliberately loses a hundred allocations and must fail.
+      - name: Prove the leak detector actually detects
+        if: matrix.san == 'leaks'
+        env:
+          CC: clang
+          ASAN_OPTIONS: detect_leaks=1
+          LSAN_OPTIONS: suppressions=.github/lsan.supp:print_suppressions=0
+          VIPSX_PROVE_LEAK_CHECK: '1'
+        run: |
+          if go test -asan -count=1 -run TestLeakDetectorIsWorking ./internal/soak/; then
+            echo "::error::leak detection is not active: a deliberate 100 KiB leak went unreported"
+            exit 1
+          fi
+          echo "leak detector confirmed active"
+
       - name: Leak detection
         if: matrix.san == 'leaks'
         env:
