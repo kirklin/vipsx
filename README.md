@@ -258,23 +258,31 @@ make asan       # Linux only, the Go toolchain has no -asan on darwin/arm64
 make cleak      # leak check the C core; needs clang
 ```
 
-Leak checking needed its own answer. `go test -asan` does not run
-LeakSanitizer — a probe that deliberately lost two thousand allocations under
-`detect_leaks=1` reported nothing and exited zero, and
+Leak checking turned out to be the thing nothing here can do, which is worth
+stating plainly rather than implying otherwise with a green badge.
+
+`go test -asan` does not run LeakSanitizer: a probe that deliberately lost two
+thousand allocations under `detect_leaks=1` reported nothing and exited zero, and
 [golang/go#67833](https://github.com/golang/go/issues/67833), the proposal to
-make it usable, is still open. Valgrind cannot read a Go binary either: Go's
+make it usable, is still open. Valgrind cannot read a Go binary either — Go's
 assembly string routines read past the end of short C strings on purpose, its
 concurrent collector confuses the memory model, and its preemption signals
-collide with Valgrind's own. So `make cleak` builds the same C sources into a
-plain program with no Go runtime, where the checker works, and it deliberately
-leaks once first to prove the checker is switched on before believing a clean
-report.
+collide with Valgrind's own. And the hosted CI runner cannot do it at all: a
+program containing nothing but a ten-block leak, built with clang 18 and run with
+`detect_leaks=1`, reports nothing and exits zero, because LeakSanitizer needs
+ptrace access the runner restricts and fails silently without it.
 
-This has already paid for itself twice. It caught a use-after-free where `Close`
-and the collector both released the same reference, and it caught
-`vips_cache_drop_all` leaking one operation and one pixel buffer per call
-afterwards — in libvips 8.18 that function destroys the cache table and nothing
-re-creates it, so `ClearCache` here shrinks the limit and restores it instead.
+So `make cleak` builds the same C sources into a plain program and says out loud
+which half it managed. Where LeakSanitizer works it proves itself on a deliberate
+leak first and then requires a clean run; where it does not, it says so and runs
+the rest of AddressSanitizer anyway — invalid reads and writes, double frees, use
+after free — over fifty rounds through every allocating path in the C core.
+
+That leaves leaks covered by `internal/soak`, which watches libvips' own
+counters rather than the process heap. That is real coverage and it has caught a
+real leak, but it sees only what libvips allocates, not the plain `malloc` and
+`strdup` calls in this package. Closing that last gap needs a machine where
+LeakSanitizer runs.
 
 ### CI
 

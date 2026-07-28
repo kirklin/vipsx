@@ -46,27 +46,24 @@ cleak:
 	clang $(CLEAK_CFLAGS) $$(pkg-config --cflags vips) \
 		vips/*.c internal/cleak/main.c \
 		$$(pkg-config --libs vips) -o /tmp/vipsx-cleak
-	@if ASAN_OPTIONS=detect_leaks=1 /tmp/vipsx-cleak --leak 2>&1 | \
-		grep -q "detect_leaks is not supported"; then \
-		echo "no LeakSanitizer on this platform: AddressSanitizer ran, leak checking did not"; \
+	@echo "--- can this machine detect leaks at all? ---"
+	@ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=exitcode=23 \
+		/tmp/vipsx-cleak --leak >/tmp/vipsx-cleak-probe.log 2>&1; \
+	probe=$$?; \
+	if [ $$probe -eq 0 ] || ! grep -q "LeakSanitizer" /tmp/vipsx-cleak-probe.log; then \
+		echo "NO. A deliberate leak was not reported as a leak, so leak checking"; \
+		echo "is off here. What the probe said:"; \
+		grep -m2 -iE "leak|not supported" /tmp/vipsx-cleak-probe.log || true; \
+		echo "AddressSanitizer still ran: invalid reads, writes and double frees"; \
+		echo "are covered below, leaks are not. Run this on a machine where"; \
+		echo "LeakSanitizer works to get the rest."; \
+		echo "--- AddressSanitizer over the C core ---"; \
 		/tmp/vipsx-cleak; \
 	else \
-		echo "--- probe A: deliberate leak, with suppressions ---"; \
-		ASAN_OPTIONS=detect_leaks=1 \
+		echo "YES. Leak checking is active and proven; requiring a clean run."; \
+		echo "--- AddressSanitizer and LeakSanitizer over the C core ---"; \
 		LSAN_OPTIONS=suppressions=$(PWD)/.github/lsan.supp:exitcode=23 \
-			/tmp/vipsx-cleak --leak > /tmp/probe-a.log 2>&1; \
-		a=$$?; echo "exit $$a"; tail -25 /tmp/probe-a.log; \
-		echo "--- probe B: same leak, no suppressions ---"; \
-		ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=exitcode=23 \
-			/tmp/vipsx-cleak --leak > /tmp/probe-b.log 2>&1; \
-		b=$$?; echo "exit $$b"; tail -25 /tmp/probe-b.log; \
-		if [ $$a -eq 0 ]; then \
-			echo "leak detection is not active: a deliberate leak went unreported"; \
-			exit 1; \
-		fi; \
-		echo "checker confirmed active"; \
-		echo "--- the real run ---"; \
-		LSAN_OPTIONS=suppressions=$(PWD)/.github/lsan.supp /tmp/vipsx-cleak; \
+			/tmp/vipsx-cleak; \
 	fi
 
 # Linux only: the Go toolchain has no -asan on darwin/arm64.
