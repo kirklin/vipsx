@@ -1,0 +1,159 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # libvips headers use -Xpreprocessor, which cgo refuses to pass on unless told.
+  CGO_CFLAGS_ALLOW: -Xpreprocessor
+
+jobs:
+  # The claim this project makes is that one copy of the code works against
+  # whatever libvips is installed. That is only worth believing if it is tested
+  # against several, so the matrix spans three real versions rather than three
+  # runners with the same one.
+  test:
+    name: test (${{ matrix.os }}, libvips from ${{ matrix.source }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            source: apt (8.12)
+          - os: ubuntu-24.04
+            source: apt (8.15)
+          - os: macos-14
+            source: brew (8.18)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install libvips (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvips-dev libvips-tools pkg-config
+
+      - name: Install libvips (macOS)
+        if: runner.os == 'macOS'
+        run: brew install vips pkg-config
+
+      - name: Report the libvips actually linked
+        run: |
+          pkg-config --modversion vips
+          vips --version
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Unit tests
+        run: go test ./vips/ -count=1
+
+      - name: Coverage against govips and vipsgen
+        run: go test ./internal/coverage/ -count=1 -v
+
+      - name: Race detector
+        run: go test ./vips/ -race -count=1
+
+      - name: Differential test against the vips CLI
+        run: go test ./internal/difftest/ -count=1 -timeout 30m
+
+      - name: Memory soak
+        run: go test ./internal/soak/ -count=1 -timeout 20m
+
+  # The generator reads the installed libvips, so its output is different on
+  # every version above. What has to hold everywhere is that generation
+  # succeeds, compiles, and passes the same tests as the committed output.
+  generate:
+    name: regenerate the typed layer
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install libvips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvips-dev libvips-tools pkg-config
+
+      - name: Regenerate
+        run: |
+          rm -f vips/zz_generated_*.go
+          go run ./cmd/vipsx-gen -out vips
+
+      - name: The regenerated layer must build and pass its tests
+        run: |
+          gofmt -l vips/zz_generated_ops.go vips/zz_generated_enums.go
+          go build ./...
+          go test ./vips/ -count=1
+
+      - name: Show what a different libvips changed
+        run: git --no-pager diff --stat -- vips/zz_generated_ops.go vips/zz_generated_enums.go || true
+
+  # Reference counting across the cgo boundary is the part of this that cannot
+  # be made correct by construction, so it gets a sanitiser rather than an
+  # argument.
+  sanitizers:
+    name: ${{ matrix.san }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        san: [asan, valgrind]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install libvips and tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvips-dev libvips-tools pkg-config clang valgrind
+
+      - name: Address sanitizer
+        if: matrix.san == 'asan'
+        env:
+          CC: clang
+          # libvips and GLib pool allocations on purpose; the interesting
+          # signals here are invalid reads, writes and double frees.
+          ASAN_OPTIONS: detect_leaks=0
+        run: go test -asan -count=1 -timeout 30m ./vips/ ./internal/soak/
+
+      - name: Valgrind over the soak binary
+        if: matrix.san == 'valgrind'
+        run: |
+          go test -c -o /tmp/soak.test ./internal/soak/
+          valgrind \
+            --error-exitcode=42 \
+            --errors-for-leak-kinds=definite \
+            --leak-check=full \
+            --show-leak-kinds=definite \
+            --suppressions=.github/valgrind.supp \
+            /tmp/soak.test -test.short -test.timeout=25m
