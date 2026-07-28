@@ -219,6 +219,36 @@ jobs:
       # So the same C sources are built into a plain program, where the checker
       # does work, and the target proves it is switched on before believing a
       # clean report.
+      # Control experiment: does LeakSanitizer work in this environment at all,
+      # on a program with nothing in it but a leak? Everything downstream is
+      # meaningless until this is answered.
+      - name: Does LeakSanitizer work here
+        if: matrix.san == 'cleak'
+        run: |
+          cat > /tmp/tiny.c <<'EOF'
+          #include <stdlib.h>
+          int main(void) {
+            for (int i = 0; i < 10; i++) {
+              char *p = malloc(4096);
+              p[0] = (char)i;
+            }
+            return 0;
+          }
+          EOF
+          clang -g -O1 -fsanitize=address -fno-omit-frame-pointer /tmp/tiny.c -o /tmp/tiny
+          echo "--- clang version ---"; clang --version | head -1
+          echo "--- running a program that is nothing but a leak ---"
+          set +e
+          ASAN_OPTIONS=detect_leaks=1 /tmp/tiny > /tmp/tiny.log 2>&1
+          echo "exit status: $?"
+          set -e
+          cat /tmp/tiny.log
+          if grep -q "LeakSanitizer" /tmp/tiny.log; then
+            echo "VERDICT: LeakSanitizer works in this environment"
+          else
+            echo "VERDICT: LeakSanitizer reports nothing even here"
+          fi
+
       - name: Leak check the C core
         if: matrix.san == 'cleak'
         env:
