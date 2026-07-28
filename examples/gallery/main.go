@@ -10,6 +10,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -403,10 +404,21 @@ func matrix3x3(values []float64) (*vips.Image, error) {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		log.Fatalf("usage: %s <source-image> <output-dir>", os.Args[0])
+	width := flag.Int("width", 600, "width to work at, in pixels")
+	ext := flag.String("format", ".jpg", "output format, by extension")
+	quality := flag.Int("q", 88, "encoder quality")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr,
+			"usage: %s [flags] <source-image> <output-dir>\n\nflags:\n", os.Args[0])
+		flag.PrintDefaults()
 	}
-	srcPath, outDir := os.Args[1], os.Args[2]
+	flag.Parse()
+
+	if flag.NArg() != 2 {
+		flag.Usage()
+		os.Exit(2)
+	}
+	srcPath, outDir := flag.Arg(0), flag.Arg(1)
 
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		log.Fatal(err)
@@ -419,14 +431,14 @@ func main() {
 	defer full.Close()
 
 	// Work at a manageable size so the page stays light.
-	src, err := vips.ThumbnailImage(full, 600, nil)
+	src, err := vips.ThumbnailImage(full, *width, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer src.Close()
 
-	if err := vips.SaveFile(src, filepath.Join(outDir, "00-source.jpg"),
-		vips.In("Q", 88)); err != nil {
+	if err := vips.SaveFile(src, filepath.Join(outDir, "00-source"+*ext),
+		vips.In("Q", *quality)); err != nil {
 		log.Fatal(err)
 	}
 
@@ -436,7 +448,7 @@ func main() {
 		d := &list[i]
 		name := fmt.Sprintf("%02d-%s", i+1, strings.NewReplacer(
 			" ", "-", ",", "", "(", "", ")", "").Replace(d.Name))
-		d.File = name + ".jpg"
+		d.File = name + *ext
 
 		start := time.Now()
 		res, err := d.Run(src)
@@ -457,7 +469,7 @@ func main() {
 			continue
 		}
 
-		if err := vips.SaveFile(flat, filepath.Join(outDir, d.File), vips.In("Q", 88)); err != nil {
+		if err := vips.SaveFile(flat, filepath.Join(outDir, d.File), vips.In("Q", *quality)); err != nil {
 			d.Err, d.File = err.Error(), ""
 			failed++
 			flat.Close()
@@ -477,7 +489,7 @@ func main() {
 
 	sort.SliceStable(list, func(i, j int) bool { return list[i].Err == "" && list[j].Err != "" })
 
-	if err := writeIndex(outDir, srcPath, list, ok, failed); err != nil {
+	if err := writeIndex(outDir, srcPath, "00-source"+*ext, list, ok, failed); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("\n%d succeeded, %d failed. Open %s\n",
@@ -560,7 +572,7 @@ const indexHTML = `<!doctype html>
 
 <div class="grid">
   <figure>
-    <img src="00-source.jpg" alt="source">
+    <img src="{{.SourceFile}}" alt="source">
     <figcaption><span class="op">source</span>
       <div class="meta">the input every entry below starts from</div>
     </figcaption>
@@ -580,7 +592,7 @@ const indexHTML = `<!doctype html>
 </div>
 `
 
-func writeIndex(dir, source string, list []demo, ok, failed int) error {
+func writeIndex(dir, source, sourceFile string, list []demo, ok, failed int) error {
 	t, err := template.New("index").Parse(indexHTML)
 	if err != nil {
 		return err
@@ -596,12 +608,14 @@ func writeIndex(dir, source string, list []demo, ok, failed int) error {
 		OK, Failed   int
 		Version, Ops string
 		Source       string
+		SourceFile   string
 	}{
-		Demos:   list,
-		OK:      ok,
-		Failed:  failed,
-		Version: vips.Version(),
-		Ops:     fmt.Sprint(len(vips.Operations())),
-		Source:  filepath.Base(source),
+		Demos:      list,
+		OK:         ok,
+		Failed:     failed,
+		Version:    vips.Version(),
+		Ops:        fmt.Sprint(len(vips.Operations())),
+		Source:     filepath.Base(source),
+		SourceFile: sourceFile,
 	})
 }
