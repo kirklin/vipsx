@@ -187,11 +187,20 @@ all 223 of govips' (185 operations, 2 reachable as aliases, 36 C helpers). 41
 operations vipsx reaches appear in neither, mostly colourspace conversions.
 
 `examples/gallery` runs 35 of these against a real photograph and writes an
-index page, labelling each with the govips method it stands in for:
+index page, labelling each with the govips method it stands in for. The rendered
+result is checked in under `site/`:
 
 ```bash
-go run ./examples/gallery photo.jpg ./out && open ./out/index.html
+make site                                    # regenerate from site/source.png
+make site SITE_SOURCE=/path/to/photo.jpg     # or from your own
+open site/index.html
 ```
+
+`site/` carries a `go.mod` of its own, which is not an accident. The go command
+treats a directory containing one as a separate module and leaves it out of the
+parent's module zip, so `go get` on this repository fetches 41 files and about
+630 KB with none of the demonstration images among them. `make check-module-size`
+fails if that ever stops being true.
 
 vipsx does not ship a typed facade. govips and vipsgen give you
 `img.Thumbnail(width, &ThumbnailOptions{...})` with compile-time argument

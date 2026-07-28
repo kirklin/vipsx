@@ -1,7 +1,7 @@
 # libvips headers use -Xpreprocessor, which cgo refuses to pass on unless told.
 export CGO_CFLAGS_ALLOW = -Xpreprocessor
 
-.PHONY: all check test race cover diff soak asan valgrind generate fmt vet ci
+.PHONY: all check test race cover diff soak asan valgrind generate site check-module-size fmt vet ci
 
 all: check fmt vet test
 
@@ -46,6 +46,27 @@ valgrind:
 		--suppressions=.github/valgrind.supp \
 		/tmp/vipsx-soak.test -test.short
 
+# Rebuild the demonstration page in site/.
+#
+# site/ carries its own go.mod, which is what keeps its images out of the module
+# zip. Anyone running `go get` on this repository should not be paying to
+# download screenshots.
+# The source lives in the repository so that regenerating needs nothing but a
+# checkout. It is in site/ rather than testdata/ for the same reason as the
+# rendered images: site/ is a separate module and none of it ships to consumers.
+SITE_SOURCE ?= site/source.png
+site:
+	rm -f site/[0-9]*.jpg site/index.html
+	go run ./examples/gallery -width 600 -format .jpg -q 90 "$(SITE_SOURCE)" site
+	@test -f site/go.mod || (echo "site/go.mod is missing; without it the images ship to every consumer" && exit 1)
+
+# Fails if the demonstration images have leaked into the module.
+check-module-size:
+	@test -f site/go.mod || (echo "site/go.mod is missing" && exit 1)
+	@go list ./... | grep -q '/site' && \
+		(echo "site is part of the module; its images would ship to consumers" && exit 1) || true
+	@echo "site/ is a separate module and stays out of the module zip"
+
 # Rebuild the typed layer from the installed libvips.
 generate:
 	rm -f vips/zz_generated_*.go
@@ -53,6 +74,6 @@ generate:
 	gofmt -w vips
 
 # Everything CI runs, minus the sanitizers.
-ci: check vet test cover race diff soak
+ci: check vet test cover race diff soak check-module-size
 	@test -z "$$(gofmt -l .)" || (echo "not gofmt-clean:"; gofmt -l .; exit 1)
 	@echo "all green"
