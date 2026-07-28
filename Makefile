@@ -51,13 +51,16 @@ cleak:
 		echo "no LeakSanitizer on this platform: AddressSanitizer ran, leak checking did not"; \
 		/tmp/vipsx-cleak; \
 	else \
-		echo "--- proving the leak checker is active ---"; \
-		LSAN_OPTIONS=suppressions=$(PWD)/.github/lsan.supp:verbosity=1 \
-			/tmp/vipsx-cleak --leak > /tmp/cleak-probe.log 2>&1; \
-		probe=$$?; \
-		echo "probe exit status: $$probe"; \
-		sed -n "1,40p" /tmp/cleak-probe.log; \
-		if [ $$probe -eq 0 ]; then \
+		echo "--- probe A: deliberate leak, with suppressions ---"; \
+		ASAN_OPTIONS=detect_leaks=1 \
+		LSAN_OPTIONS=suppressions=$(PWD)/.github/lsan.supp:exitcode=23 \
+			/tmp/vipsx-cleak --leak > /tmp/probe-a.log 2>&1; \
+		a=$$?; echo "exit $$a"; tail -25 /tmp/probe-a.log; \
+		echo "--- probe B: same leak, no suppressions ---"; \
+		ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=exitcode=23 \
+			/tmp/vipsx-cleak --leak > /tmp/probe-b.log 2>&1; \
+		b=$$?; echo "exit $$b"; tail -25 /tmp/probe-b.log; \
+		if [ $$a -eq 0 ]; then \
 			echo "leak detection is not active: a deliberate leak went unreported"; \
 			exit 1; \
 		fi; \
