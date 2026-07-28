@@ -32,7 +32,14 @@ VipsTarget *vipsx_target_new_to_memory(void) {
 // targets backed by a descriptor. Read the property, and copy out of it so the
 // caller owns something with a lifetime it controls.
 void *vipsx_target_steal(VipsTarget *target, size_t *len) {
+  // Flushing a target was vips_target_finish until 8.13 renamed it to
+  // vips_target_end, and the old name is gone from recent headers. Neither
+  // spelling works everywhere, so pick by version rather than by hope.
+#if VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 13)
   vips_target_end(target);
+#else
+  vips_target_finish(target);
+#endif
 
   VipsBlob *blob = NULL;
   g_object_get(target, "blob", &blob, NULL);

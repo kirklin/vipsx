@@ -42,7 +42,7 @@
     <img src="01-Resize.jpg" alt="Resize" loading="lazy">
     <figcaption>
       <span class="op">Resize</span>
-      <div class="meta">240&times;300 &middot; 30441 bytes &middot; 206µs</div>
+      <div class="meta">240&times;300 &middot; 30441 bytes &middot; 246µs</div>
       <div class="govips">govips: <b>Resize</b></div>
       <code>vips.Resize(im, 0.5, nil)</code>
     </figcaption>
@@ -52,7 +52,7 @@
     <img src="02-Resize-nearest-neighbour.jpg" alt="Resize, nearest neighbour" loading="lazy">
     <figcaption>
       <span class="op">Resize, nearest neighbour</span>
-      <div class="meta">120&times;150 &middot; 11031 bytes &middot; 193µs</div>
+      <div class="meta">120&times;150 &middot; 11031 bytes &middot; 175µs</div>
       <div class="govips">govips: <b>Resize &#43; KernelNearest</b></div>
       <code>vips.Resize(im, 0.25, &amp;vips.ResizeOptions{
     Kernel: vips.Ptr(vips.KernelNearest),  // KernelNearest is 0, and it is sent
@@ -64,7 +64,7 @@
     <img src="03-ThumbnailImage.jpg" alt="ThumbnailImage" loading="lazy">
     <figcaption>
       <span class="op">ThumbnailImage</span>
-      <div class="meta">320&times;400 &middot; 47889 bytes &middot; 261µs</div>
+      <div class="meta">320&times;400 &middot; 47889 bytes &middot; 248µs</div>
       <div class="govips">govips: <b>Thumbnail</b></div>
       <code>vips.ThumbnailImage(im, 400, nil)</code>
     </figcaption>
@@ -74,7 +74,7 @@
     <img src="04-Smartcrop.jpg" alt="Smartcrop" loading="lazy">
     <figcaption>
       <span class="op">Smartcrop</span>
-      <div class="meta">400&times;400 &middot; 58133 bytes &middot; 7.019ms</div>
+      <div class="meta">400&times;400 &middot; 58133 bytes &middot; 6.815ms</div>
       <div class="govips">govips: <b>SmartCrop</b></div>
       <code>vips.Smartcrop(im, 400, 400, &amp;vips.SmartcropOptions{
     Interesting: vips.Ptr(vips.InterestingAttention),
@@ -86,7 +86,7 @@
     <img src="05-ExtractArea.jpg" alt="ExtractArea" loading="lazy">
     <figcaption>
       <span class="op">ExtractArea</span>
-      <div class="meta">320&times;240 &middot; 25233 bytes &middot; 75µs</div>
+      <div class="meta">320&times;240 &middot; 25233 bytes &middot; 56µs</div>
       <div class="govips">govips: <b>Crop / ExtractArea</b></div>
       <code>vips.ExtractArea(im, 80, 80, 320, 240)</code>
     </figcaption>
@@ -96,7 +96,7 @@
     <img src="06-Rot.jpg" alt="Rot" loading="lazy">
     <figcaption>
       <span class="op">Rot</span>
-      <div class="meta">600&times;480 &middot; 92717 bytes &middot; 47µs</div>
+      <div class="meta">600&times;480 &middot; 92717 bytes &middot; 28µs</div>
       <div class="govips">govips: <b>Rotate</b></div>
       <code>vips.Rot(im, vips.AngleD90)</code>
     </figcaption>
@@ -106,7 +106,7 @@
     <img src="07-Rotate-arbitrary-angle.jpg" alt="Rotate, arbitrary angle" loading="lazy">
     <figcaption>
       <span class="op">Rotate, arbitrary angle</span>
-      <div class="meta">598&times;690 &middot; 94240 bytes &middot; 324µs</div>
+      <div class="meta">598&times;690 &middot; 94240 bytes &middot; 314µs</div>
       <div class="govips">govips: <b>Similarity</b></div>
       <code>vips.Rotate(im, 12.5, nil)</code>
     </figcaption>
@@ -116,7 +116,7 @@
     <img src="08-Flip.jpg" alt="Flip" loading="lazy">
     <figcaption>
       <span class="op">Flip</span>
-      <div class="meta">480&times;600 &middot; 92747 bytes &middot; 37µs</div>
+      <div class="meta">480&times;600 &middot; 92747 bytes &middot; 48µs</div>
       <div class="govips">govips: <b>Flip</b></div>
       <code>vips.Flip(im, vips.DirectionVertical)</code>
     </figcaption>
@@ -126,7 +126,7 @@
     <img src="09-Autorot.jpg" alt="Autorot" loading="lazy">
     <figcaption>
       <span class="op">Autorot</span>
-      <div class="meta">480&times;600 &middot; 92736 bytes &middot; 44µs</div>
+      <div class="meta">480&times;600 &middot; 92736 bytes &middot; 43µs</div>
       <div class="govips">govips: <b>AutoRotate</b></div>
       <code>vips.Autorot(im)</code>
     </figcaption>
@@ -136,7 +136,7 @@
     <img src="10-Embed.jpg" alt="Embed" loading="lazy">
     <figcaption>
       <span class="op">Embed</span>
-      <div class="meta">720&times;720 &middot; 104404 bytes &middot; 39µs</div>
+      <div class="meta">720&times;720 &middot; 104404 bytes &middot; 38µs</div>
       <div class="govips">govips: <b>Embed / EmbedBackground</b></div>
       <code>vips.Embed(im, 60, 60, 720, 720, &amp;vips.EmbedOptions{
     Extend: vips.Ptr(vips.ExtendWhite),
@@ -148,7 +148,7 @@
     <img src="11-Gravity.jpg" alt="Gravity" loading="lazy">
     <figcaption>
       <span class="op">Gravity</span>
-      <div class="meta">700&times;700 &middot; 100678 bytes &middot; 50µs</div>
+      <div class="meta">700&times;700 &middot; 100678 bytes &middot; 34µs</div>
       <div class="govips">govips: <b>Gravity</b></div>
       <code>vips.Gravity(im, vips.CompassDirectionWest, 700, 700, nil)</code>
     </figcaption>
@@ -158,7 +158,7 @@
     <img src="12-Replicate.jpg" alt="Replicate" loading="lazy">
     <figcaption>
       <span class="op">Replicate</span>
-      <div class="meta">960&times;1200 &middot; 368614 bytes &middot; 34µs</div>
+      <div class="meta">960&times;1200 &middot; 368614 bytes &middot; 31µs</div>
       <div class="govips">govips: <b>Replicate</b></div>
       <code>vips.Replicate(im, 2, 2)</code>
     </figcaption>
@@ -168,7 +168,7 @@
     <img src="13-Zoom.jpg" alt="Zoom" loading="lazy">
     <figcaption>
       <span class="op">Zoom</span>
-      <div class="meta">960&times;1200 &middot; 272240 bytes &middot; 36µs</div>
+      <div class="meta">960&times;1200 &middot; 272240 bytes &middot; 38µs</div>
       <div class="govips">govips: <b>Zoom</b></div>
       <code>vips.Zoom(im, 2, 2)</code>
     </figcaption>
@@ -178,7 +178,7 @@
     <img src="14-Gaussblur.jpg" alt="Gaussblur" loading="lazy">
     <figcaption>
       <span class="op">Gaussblur</span>
-      <div class="meta">480&times;600 &middot; 41827 bytes &middot; 614µs</div>
+      <div class="meta">480&times;600 &middot; 41827 bytes &middot; 570µs</div>
       <div class="govips">govips: <b>GaussianBlur</b></div>
       <code>vips.Gaussblur(im, 4.0, nil)</code>
     </figcaption>
@@ -188,7 +188,7 @@
     <img src="15-Sharpen.jpg" alt="Sharpen" loading="lazy">
     <figcaption>
       <span class="op">Sharpen</span>
-      <div class="meta">480&times;600 &middot; 123768 bytes &middot; 1.313ms</div>
+      <div class="meta">480&times;600 &middot; 123768 bytes &middot; 1.138ms</div>
       <div class="govips">govips: <b>Sharpen</b></div>
       <code>vips.Sharpen(im, &amp;vips.SharpenOptions{
     Sigma: vips.Ptr(1.5), M2: vips.Ptr(8.0),
@@ -200,7 +200,7 @@
     <img src="16-Sobel.jpg" alt="Sobel" loading="lazy">
     <figcaption>
       <span class="op">Sobel</span>
-      <div class="meta">480&times;600 &middot; 221987 bytes &middot; 637µs</div>
+      <div class="meta">480&times;600 &middot; 221987 bytes &middot; 635µs</div>
       <div class="govips">govips: <b>Sobel</b></div>
       <code>vips.Sobel(im)</code>
     </figcaption>
@@ -210,7 +210,7 @@
     <img src="17-Canny.jpg" alt="Canny" loading="lazy">
     <figcaption>
       <span class="op">Canny</span>
-      <div class="meta">480&times;600 &middot; 63659 bytes &middot; 1.028ms</div>
+      <div class="meta">480&times;600 &middot; 63659 bytes &middot; 1.007ms</div>
       <div class="govips">govips: <b>(not in govips)</b></div>
       <code>vips.Canny(im, &amp;vips.CannyOptions{Sigma: vips.Ptr(1.4)})</code>
     </figcaption>
@@ -220,7 +220,7 @@
     <img src="18-Invert.jpg" alt="Invert" loading="lazy">
     <figcaption>
       <span class="op">Invert</span>
-      <div class="meta">480&times;600 &middot; 92774 bytes &middot; 59µs</div>
+      <div class="meta">480&times;600 &middot; 92774 bytes &middot; 65µs</div>
       <div class="govips">govips: <b>Invert</b></div>
       <code>vips.Invert(im)</code>
     </figcaption>
@@ -230,7 +230,7 @@
     <img src="19-Gamma.jpg" alt="Gamma" loading="lazy">
     <figcaption>
       <span class="op">Gamma</span>
-      <div class="meta">480&times;600 &middot; 100559 bytes &middot; 207µs</div>
+      <div class="meta">480&times;600 &middot; 100559 bytes &middot; 180µs</div>
       <div class="govips">govips: <b>Gamma</b></div>
       <code>vips.Gamma(im, &amp;vips.GammaOptions{Exponent: vips.Ptr(2.2)})</code>
     </figcaption>
@@ -240,7 +240,7 @@
     <img src="20-Linear.jpg" alt="Linear" loading="lazy">
     <figcaption>
       <span class="op">Linear</span>
-      <div class="meta">480&times;600 &middot; 88239 bytes &middot; 78µs</div>
+      <div class="meta">480&times;600 &middot; 88239 bytes &middot; 90µs</div>
       <div class="govips">govips: <b>Linear / Linear1</b></div>
       <code>vips.Linear(im, []float64{1.4, 1, 0.8}, []float64{-20, 0, 20}, nil)</code>
     </figcaption>
@@ -250,7 +250,7 @@
     <img src="21-Colourspace-to-b-w.jpg" alt="Colourspace to b-w" loading="lazy">
     <figcaption>
       <span class="op">Colourspace to b-w</span>
-      <div class="meta">480&times;600 &middot; 65018 bytes &middot; 89µs</div>
+      <div class="meta">480&times;600 &middot; 65018 bytes &middot; 60µs</div>
       <div class="govips">govips: <b>ToColorSpace</b></div>
       <code>vips.Colourspace(im, vips.InterpretationBW, nil)</code>
     </figcaption>
@@ -260,7 +260,7 @@
     <img src="22-Rank-median-filter.jpg" alt="Rank, median filter" loading="lazy">
     <figcaption>
       <span class="op">Rank, median filter</span>
-      <div class="meta">480&times;600 &middot; 67557 bytes &middot; 336µs</div>
+      <div class="meta">480&times;600 &middot; 67557 bytes &middot; 335µs</div>
       <div class="govips">govips: <b>Rank</b></div>
       <code>vips.Rank(im, 5, 5, 12)</code>
     </figcaption>
@@ -270,7 +270,7 @@
     <img src="23-Recomb-sepia.jpg" alt="Recomb, sepia" loading="lazy">
     <figcaption>
       <span class="op">Recomb, sepia</span>
-      <div class="meta">480&times;600 &middot; 78939 bytes &middot; 1.61ms</div>
+      <div class="meta">480&times;600 &middot; 78939 bytes &middot; 1.475ms</div>
       <div class="govips">govips: <b>Recomb</b></div>
       <code>m, _ := matrix3x3(sepia...)
 vips.Recomb(im, m)</code>
@@ -281,7 +281,7 @@ vips.Recomb(im, m)</code>
     <img src="24-HistEqual.jpg" alt="HistEqual" loading="lazy">
     <figcaption>
       <span class="op">HistEqual</span>
-      <div class="meta">480&times;600 &middot; 125888 bytes &middot; 2.447ms</div>
+      <div class="meta">480&times;600 &middot; 125888 bytes &middot; 1.723ms</div>
       <div class="govips">govips: <b>HistogramNormalise</b></div>
       <code>vips.HistEqual(im, nil)</code>
     </figcaption>
@@ -291,7 +291,7 @@ vips.Recomb(im, m)</code>
     <img src="25-HistFind-on-band-0.jpg" alt="HistFind on band 0" loading="lazy">
     <figcaption>
       <span class="op">HistFind on band 0</span>
-      <div class="meta">256&times;256 &middot; 5301 bytes &middot; 2.116ms</div>
+      <div class="meta">256&times;256 &middot; 5301 bytes &middot; 1.876ms</div>
       <div class="govips">govips: <b>HistogramFind</b></div>
       <code>hist, _ := vips.HistFind(im, &amp;vips.HistFindOptions{
     Band: vips.Ptr(0),  // band 0, not every band
@@ -305,9 +305,11 @@ vips.HistPlot(norm)</code>
     <img src="26-Flatten-onto-red.jpg" alt="Flatten onto red" loading="lazy">
     <figcaption>
       <span class="op">Flatten onto red</span>
-      <div class="meta">480&times;600 &middot; 92736 bytes &middot; 317µs</div>
+      <div class="meta">480&times;600 &middot; 92736 bytes &middot; 299µs</div>
       <div class="govips">govips: <b>Flatten</b></div>
-      <code>rgba, _ := vips.Addalpha(im)
+      <code>// bandjoin_const rather than addalpha: addalpha only became an
+// operation after 8.15, and this runs on 8.12 too.
+rgba, _ := vips.BandjoinConst(im, []float64{255})
 vips.Flatten(rgba, &amp;vips.FlattenOptions{
     Background: vips.Ptr([]float64{255, 0, 0}),
 })</code>
@@ -318,7 +320,7 @@ vips.Flatten(rgba, &amp;vips.FlattenOptions{
     <img src="27-ExtractBand.jpg" alt="ExtractBand" loading="lazy">
     <figcaption>
       <span class="op">ExtractBand</span>
-      <div class="meta">480&times;600 &middot; 66944 bytes &middot; 52µs</div>
+      <div class="meta">480&times;600 &middot; 66944 bytes &middot; 37µs</div>
       <div class="govips">govips: <b>ExtractBand</b></div>
       <code>vips.ExtractBand(im, 0, nil)</code>
     </figcaption>
@@ -328,7 +330,7 @@ vips.Flatten(rgba, &amp;vips.FlattenOptions{
     <img src="28-BandjoinConst.jpg" alt="BandjoinConst" loading="lazy">
     <figcaption>
       <span class="op">BandjoinConst</span>
-      <div class="meta">480&times;600 &middot; 92928 bytes &middot; 201µs</div>
+      <div class="meta">480&times;600 &middot; 92928 bytes &middot; 132µs</div>
       <div class="govips">govips: <b>BandJoinConst</b></div>
       <code>vips.BandjoinConst(im, []float64{128})</code>
     </figcaption>
@@ -338,7 +340,7 @@ vips.Flatten(rgba, &amp;vips.FlattenOptions{
     <img src="29-Composite2-saturate.jpg" alt="Composite2, saturate" loading="lazy">
     <figcaption>
       <span class="op">Composite2, saturate</span>
-      <div class="meta">480&times;600 &middot; 92736 bytes &middot; 1.146ms</div>
+      <div class="meta">480&times;600 &middot; 92736 bytes &middot; 1.111ms</div>
       <div class="govips">govips: <b>Composite</b></div>
       <code>blur, _ := vips.Gaussblur(im, 12.0, nil)
 vips.Composite2(im, blur, vips.BlendModeSaturate, nil)</code>
@@ -349,12 +351,12 @@ vips.Composite2(im, blur, vips.BlendModeSaturate, nil)</code>
     <img src="30-Text-over-an-image.jpg" alt="Text over an image" loading="lazy">
     <figcaption>
       <span class="op">Text over an image</span>
-      <div class="meta">480&times;600 &middot; 93160 bytes &middot; 137.21ms</div>
+      <div class="meta">480&times;600 &middot; 93160 bytes &middot; 127.54ms</div>
       <div class="govips">govips: <b>Label</b></div>
       <code>txt, _ := vips.Text(&#34;vipsx&#34;, &amp;vips.TextOptions{
     Font: vips.Ptr(&#34;sans bold 72&#34;), Rgba: vips.Ptr(true),
 })
-base, _ := vips.Addalpha(im)
+base, _ := vips.BandjoinConst(im, []float64{255})
 vips.Composite2(base, txt, vips.BlendModeOver, &amp;vips.Composite2Options{
     X: vips.Ptr(40), Y: vips.Ptr(40),
 })</code>
@@ -365,7 +367,7 @@ vips.Composite2(base, txt, vips.BlendModeOver, &amp;vips.Composite2Options{
     <img src="31-DrawRect.jpg" alt="DrawRect" loading="lazy">
     <figcaption>
       <span class="op">DrawRect</span>
-      <div class="meta">480&times;600 &middot; 96220 bytes &middot; 2.526ms</div>
+      <div class="meta">480&times;600 &middot; 96220 bytes &middot; 1.939ms</div>
       <div class="govips">govips: <b>DrawRect</b></div>
       <code>own, _ := vips.Copy(im, nil)   // draw_* mutate in place
 vips.DrawRect(own, []float64{255, 0, 0}, 60, 60, 300, 200, nil)</code>
@@ -376,7 +378,7 @@ vips.DrawRect(own, []float64{255, 0, 0}, 60, 60, 300, 200, nil)</code>
     <img src="32-Arrayjoin.jpg" alt="Arrayjoin" loading="lazy">
     <figcaption>
       <span class="op">Arrayjoin</span>
-      <div class="meta">960&times;600 &middot; 161885 bytes &middot; 500µs</div>
+      <div class="meta">960&times;600 &middot; 161885 bytes &middot; 494µs</div>
       <div class="govips">govips: <b>ArrayJoin</b></div>
       <code>gray, _ := vips.Colourspace(im, vips.InterpretationBW, nil)
 back, _ := vips.Colourspace(gray, vips.InterpretationSrgb, nil)
@@ -390,7 +392,7 @@ vips.Arrayjoin([]*vips.Image{im, back}, &amp;vips.ArrayjoinOptions{
     <img src="33-Similarity.jpg" alt="Similarity" loading="lazy">
     <figcaption>
       <span class="op">Similarity</span>
-      <div class="meta">394&times;437 &middot; 46483 bytes &middot; 660µs</div>
+      <div class="meta">394&times;437 &middot; 46483 bytes &middot; 448µs</div>
       <div class="govips">govips: <b>Similarity</b></div>
       <code>vips.Similarity(im, &amp;vips.SimilarityOptions{
     Scale: vips.Ptr(0.6), Angle: vips.Ptr(20.0),
@@ -402,7 +404,7 @@ vips.Arrayjoin([]*vips.Image{im, back}, &amp;vips.ArrayjoinOptions{
     <img src="34-Affine-shear.jpg" alt="Affine, shear" loading="lazy">
     <figcaption>
       <span class="op">Affine, shear</span>
-      <div class="meta">660&times;600 &middot; 95013 bytes &middot; 325µs</div>
+      <div class="meta">660&times;600 &middot; 95013 bytes &middot; 289µs</div>
       <div class="govips">govips: <b>(not in govips)</b></div>
       <code>vips.Affine(im, []float64{1, 0.3, 0, 1}, nil)</code>
     </figcaption>
@@ -412,7 +414,7 @@ vips.Arrayjoin([]*vips.Image{im, back}, &amp;vips.ArrayjoinOptions{
     <img src="35-Falsecolour.jpg" alt="Falsecolour" loading="lazy">
     <figcaption>
       <span class="op">Falsecolour</span>
-      <div class="meta">480&times;600 &middot; 238517 bytes &middot; 261µs</div>
+      <div class="meta">480&times;600 &middot; 238517 bytes &middot; 243µs</div>
       <div class="govips">govips: <b>(not in govips)</b></div>
       <code>gray, _ := vips.Colourspace(im, vips.InterpretationBW, nil)
 vips.Falsecolour(gray)</code>

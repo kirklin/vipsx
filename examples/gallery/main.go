@@ -236,12 +236,14 @@ vips.HistPlot(norm)`,
 		},
 		{
 			Name: "Flatten onto red", Govips: "Flatten",
-			Code: `rgba, _ := vips.Addalpha(im)
+			Code: `// bandjoin_const rather than addalpha: addalpha only became an
+// operation after 8.15, and this runs on 8.12 too.
+rgba, _ := vips.BandjoinConst(im, []float64{255})
 vips.Flatten(rgba, &vips.FlattenOptions{
     Background: vips.Ptr([]float64{255, 0, 0}),
 })`,
 			Run: func(im *vips.Image) (*vips.Image, error) {
-				rgba, err := vips.Addalpha(im)
+				rgba, err := vips.BandjoinConst(im, []float64{255})
 				if err != nil {
 					return nil, err
 				}
@@ -281,7 +283,7 @@ vips.Composite2(im, blur, vips.BlendModeSaturate, nil)`,
 			Code: `txt, _ := vips.Text("vipsx", &vips.TextOptions{
     Font: vips.Ptr("sans bold 72"), Rgba: vips.Ptr(true),
 })
-base, _ := vips.Addalpha(im)
+base, _ := vips.BandjoinConst(im, []float64{255})
 vips.Composite2(base, txt, vips.BlendModeOver, &vips.Composite2Options{
     X: vips.Ptr(40), Y: vips.Ptr(40),
 })`,
@@ -295,7 +297,7 @@ vips.Composite2(base, txt, vips.BlendModeOver, &vips.Composite2Options{
 				}
 				defer txt.Close()
 
-				base, err := vips.Addalpha(im)
+				base, err := vips.BandjoinConst(im, []float64{255})
 				if err != nil {
 					return nil, err
 				}
