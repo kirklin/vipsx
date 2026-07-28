@@ -1,0 +1,19 @@
+# GLib, GObject and libvips allocate tables at startup and keep them for the
+# life of the process on purpose. Those are reachable, not lost, but the leak
+# checker cannot tell the difference from outside, so name them here.
+#
+# Anything not listed is a genuine leak in this binding's own reference
+# counting, which is the only thing this check exists to find.
+
+leak:g_type_register
+leak:g_type_class_ref
+leak:g_quark
+leak:g_once_init_enter
+leak:g_malloc
+leak:g_realloc
+leak:g_slice_alloc
+leak:vips_init
+leak:vips_operation_new
+leak:vips_cache_operation_add
+leak:vips__thread
+leak:dlopen

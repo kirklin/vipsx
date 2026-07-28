@@ -168,13 +168,21 @@ jobs:
   # Reference counting across the cgo boundary is the part of this that cannot
   # be made correct by construction, so it gets a sanitiser rather than an
   # argument.
+  #
+  # Valgrind was tried here and removed. It cannot read a Go binary: Go's
+  # assembly string routines read 32 bytes at a time and mask the tail, which
+  # Valgrind reports as an overrun of every short C string; its concurrent
+  # collector and stack copying produce hundreds more; and Go's preemption
+  # signals collide with Valgrind's own SIGRT32. None of that is a defect in
+  # this package, and a check that can never pass is worse than no check.
+  # AddressSanitizer understands the cgo boundary and does the same job.
   sanitizers:
     name: ${{ matrix.san }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        san: [asan, valgrind]
+        san: [asan, leaks]
     steps:
       - uses: actions/checkout@v4
 
@@ -187,7 +195,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libvips-dev libvips-tools pkg-config clang valgrind
+            libvips-dev libvips-tools pkg-config clang
 
       - name: Address sanitizer
         if: matrix.san == 'asan'
@@ -198,14 +206,13 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0
         run: go test -asan -count=1 -timeout 30m ./vips/ ./internal/soak/
 
-      - name: Valgrind over the soak binary
-        if: matrix.san == 'valgrind'
-        run: |
-          go test -c -o /tmp/soak.test ./internal/soak/
-          valgrind \
-            --error-exitcode=42 \
-            --errors-for-leak-kinds=definite \
-            --leak-check=full \
-            --show-leak-kinds=definite \
-            --suppressions=.github/valgrind.supp \
-            /tmp/soak.test -test.short -test.timeout=25m
+      # The same build with leak detection on. The suppression file covers the
+      # tables GLib and libvips keep for the life of the process; what is left
+      # is this package losing a reference it owns.
+      - name: Leak detection
+        if: matrix.san == 'leaks'
+        env:
+          CC: clang
+          ASAN_OPTIONS: detect_leaks=1
+          LSAN_OPTIONS: suppressions=.github/lsan.supp:print_suppressions=0
+        run: go test -asan -count=1 -timeout 30m ./internal/soak/ -v
