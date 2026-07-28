@@ -209,47 +209,21 @@ jobs:
       # The same build with leak detection on. The suppression file covers the
       # tables GLib and libvips keep for the life of the process; what is left
       # is this package losing a reference it owns.
-      # A leak check for the C core with no Go runtime in the way.
+      # AddressSanitizer over the C core, with no Go runtime in the way.
       #
-      # Go's -asan does not run LeakSanitizer. That was measured, not assumed:
-      # a probe that deliberately lost two thousand allocations under
-      # detect_leaks=1 with verbosity raised reported nothing and exited zero.
-      # golang/go#67833, the proposal to make it usable, is still open.
+      # This started out as a leak check and is not one, because nothing here
+      # can do leak checking. Go's -asan does not run LeakSanitizer
+      # (golang/go#67833 is still open), and neither does this runner: a program
+      # containing nothing but a ten-block leak, built with clang 18 and run
+      # with detect_leaks=1, reports nothing and exits zero. Hosted runners
+      # restrict the ptrace access LeakSanitizer needs, and it fails silently.
       #
-      # So the same C sources are built into a plain program, where the checker
-      # does work, and the target proves it is switched on before believing a
-      # clean report.
-      # Control experiment: does LeakSanitizer work in this environment at all,
-      # on a program with nothing in it but a leak? Everything downstream is
-      # meaningless until this is answered.
-      - name: Does LeakSanitizer work here
-        if: matrix.san == 'cleak'
-        run: |
-          cat > /tmp/tiny.c <<'EOF'
-          #include <stdlib.h>
-          int main(void) {
-            for (int i = 0; i < 10; i++) {
-              char *p = malloc(4096);
-              p[0] = (char)i;
-            }
-            return 0;
-          }
-          EOF
-          clang -g -O1 -fsanitize=address -fno-omit-frame-pointer /tmp/tiny.c -o /tmp/tiny
-          echo "--- clang version ---"; clang --version | head -1
-          echo "--- running a program that is nothing but a leak ---"
-          set +e
-          ASAN_OPTIONS=detect_leaks=1 /tmp/tiny > /tmp/tiny.log 2>&1
-          echo "exit status: $?"
-          set -e
-          cat /tmp/tiny.log
-          if grep -q "LeakSanitizer" /tmp/tiny.log; then
-            echo "VERDICT: LeakSanitizer works in this environment"
-          else
-            echo "VERDICT: LeakSanitizer reports nothing even here"
-          fi
-
-      - name: Leak check the C core
+      # What does run is the rest of AddressSanitizer, over the same C sources a
+      # caller links: invalid reads and writes, double frees, use after free.
+      # The target says out loud which of the two it managed, so a green run
+      # here is never mistaken for a leak-free verdict. Leaks in libvips'
+      # own allocations are covered by internal/soak instead.
+      - name: AddressSanitizer over the C core
         if: matrix.san == 'cleak'
         env:
           CC: clang
