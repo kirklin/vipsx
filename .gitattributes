@@ -1,0 +1,8 @@
+# The typed layer is written by cmd/vipsx-gen. Marking it generated keeps it out
+# of language statistics and collapses it in diffs, where reviewing 16,000 lines
+# of mechanical output helps nobody. Review the generator instead.
+vips/zz_generated_ops.go   linguist-generated=true
+vips/zz_generated_enums.go linguist-generated=true
+
+# Operation lists scraped from other bindings, used by internal/coverage.
+internal/coverage/testdata/*.txt linguist-generated=true
