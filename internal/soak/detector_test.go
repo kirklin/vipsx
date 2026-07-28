@@ -24,8 +24,8 @@ func TestLeakDetectorIsWorking(t *testing.T) {
 
 	// Enough blocks, and enough distance from the allocating frame, that none
 	// can still be reachable from a stale register or stack slot.
-	for range 100 {
+	for range 2000 {
 		leakOneBlock()
 	}
-	t.Log("leaked 100 blocks of 1 KiB; the leak checker must now fail this run")
+	t.Log("leaked 2000 blocks of 1 KiB; the leak checker must now fail this run")
 }

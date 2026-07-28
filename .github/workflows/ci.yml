@@ -217,11 +217,15 @@ jobs:
         if: matrix.san == 'leaks'
         env:
           CC: clang
-          ASAN_OPTIONS: detect_leaks=1
-          LSAN_OPTIONS: suppressions=.github/lsan.supp:print_suppressions=0
+          ASAN_OPTIONS: detect_leaks=1:verbosity=1
+          LSAN_OPTIONS: suppressions=.github/lsan.supp:print_suppressions=0:verbosity=1
           VIPSX_PROVE_LEAK_CHECK: '1'
         run: |
-          if go test -asan -count=1 -run TestLeakDetectorIsWorking ./internal/soak/; then
+          set -x
+          go test -asan -count=1 -run TestLeakDetectorIsWorking ./internal/soak/ 2>&1 | tee /tmp/probe.log || true
+          set +x
+          echo "--- exit status of the probe run ---"
+          if go test -asan -count=1 -run TestLeakDetectorIsWorking ./internal/soak/ >/dev/null 2>&1; then
             echo "::error::leak detection is not active: a deliberate 100 KiB leak went unreported"
             exit 1
           fi
