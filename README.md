@@ -255,8 +255,20 @@ allocation count and the descriptor count exactly where they started.
 ```bash
 make soak
 make asan       # Linux only, the Go toolchain has no -asan on darwin/arm64
-make valgrind   # Linux
+make cleak      # leak check the C core; needs clang
 ```
+
+Leak checking needed its own answer. `go test -asan` does not run
+LeakSanitizer — a probe that deliberately lost two thousand allocations under
+`detect_leaks=1` reported nothing and exited zero, and
+[golang/go#67833](https://github.com/golang/go/issues/67833), the proposal to
+make it usable, is still open. Valgrind cannot read a Go binary either: Go's
+assembly string routines read past the end of short C strings on purpose, its
+concurrent collector confuses the memory model, and its preemption signals
+collide with Valgrind's own. So `make cleak` builds the same C sources into a
+plain program with no Go runtime, where the checker works, and it deliberately
+leaks once first to prove the checker is switched on before believing a clean
+report.
 
 This has already paid for itself twice. It caught a use-after-free where `Close`
 and the collector both released the same reference, and it caught

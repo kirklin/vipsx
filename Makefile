@@ -1,7 +1,7 @@
 # libvips headers use -Xpreprocessor, which cgo refuses to pass on unless told.
 export CGO_CFLAGS_ALLOW = -Xpreprocessor
 
-.PHONY: all check test race cover diff soak asan valgrind generate site check-module-size fmt vet ci
+.PHONY: all check test race cover diff soak asan cleak generate site check-module-size fmt vet ci
 
 all: check fmt vet test
 
@@ -34,17 +34,38 @@ diff:
 soak:
 	go test ./internal/soak/ -count=1 -timeout 20m
 
+# A leak check for the C core, with no Go runtime to confuse the checker.
+#
+# Go's -asan does not run LeakSanitizer, which was established by deliberately
+# losing two thousand allocations and watching the run report nothing. This
+# builds the same C sources into a plain program instead, where the checker
+# works. --leak first, to prove the checker is on before believing it.
+CLEAK_CFLAGS = -g -O1 -fsanitize=address -fno-omit-frame-pointer -Ivips
+cleak:
+	@which clang >/dev/null || (echo "clang is needed for -fsanitize=address" && exit 1)
+	clang $(CLEAK_CFLAGS) $$(pkg-config --cflags vips) \
+		vips/*.c internal/cleak/main.c \
+		$$(pkg-config --libs vips) -o /tmp/vipsx-cleak
+	@if ASAN_OPTIONS=detect_leaks=1 /tmp/vipsx-cleak --leak 2>&1 | \
+		grep -q "detect_leaks is not supported"; then \
+		echo "no LeakSanitizer on this platform: AddressSanitizer ran, leak checking did not"; \
+		/tmp/vipsx-cleak; \
+	else \
+		echo "--- proving the leak checker is active ---"; \
+		if LSAN_OPTIONS=suppressions=$(PWD)/.github/lsan.supp \
+			/tmp/vipsx-cleak --leak >/dev/null 2>&1; then \
+			echo "leak detection is not active: a deliberate leak went unreported"; \
+			exit 1; \
+		fi; \
+		echo "checker confirmed active"; \
+		echo "--- the real run ---"; \
+		LSAN_OPTIONS=suppressions=$(PWD)/.github/lsan.supp /tmp/vipsx-cleak; \
+	fi
+
 # Linux only: the Go toolchain has no -asan on darwin/arm64.
 asan:
 	CC=clang ASAN_OPTIONS=detect_leaks=0 \
 		go test -asan -count=1 -timeout 30m ./vips/ ./internal/soak/
-
-valgrind:
-	go test -c -o /tmp/vipsx-soak.test ./internal/soak/
-	valgrind --error-exitcode=42 --leak-check=full \
-		--show-leak-kinds=definite --errors-for-leak-kinds=definite \
-		--suppressions=.github/valgrind.supp \
-		/tmp/vipsx-soak.test -test.short
 
 # Rebuild the demonstration page in site/.
 #
