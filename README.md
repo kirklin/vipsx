@@ -31,7 +31,13 @@ default, drop to `Call` for an operation the generator has not been run against.
 
 ## Install
 
-Needs libvips and a C toolchain.
+Needs libvips 8.14 or newer, and a C toolchain.
+
+The floor is where it is because CI tests it there: Debian 12 carries 8.14 and is
+supported into 2028. 8.12 was tried and dropped — it builds after a little
+conditional compilation, then dies with a stack smash inside libvips partway
+through the differential suite, and the only common distribution still shipping
+it, Ubuntu 22.04, leaves support in April 2027.
 
 ```bash
 brew install vips        # or: apt install libvips-dev
@@ -261,10 +267,16 @@ re-creates it, so `ClearCache` here shrinks the limit and restores it instead.
 ### CI
 
 `.github/workflows/ci.yml` runs the whole set against three real libvips
-versions, since "one binding, any version" is worth nothing untested: 8.12 on
-ubuntu-22.04, 8.15 on ubuntu-24.04 and 8.18 on macOS. A separate job regenerates
-the typed layer against the CI libvips and requires the result to build and pass,
-and a third runs ASan and Valgrind over the soak suite.
+versions, since "one binding, any version" is worth nothing untested: 8.14 in a
+Debian 12 container, 8.15 on ubuntu-24.04, and 8.18 on macOS. The oldest is
+tested in a container because no runner image ships it, and testing the floor is
+the only thing that makes the floor a fact rather than a hope. A separate job
+regenerates the typed layer against the CI libvips and requires the result to
+build and pass, and a third runs ASan and Valgrind over the soak suite.
+
+For comparison: govips states 8.14+ but its CI exercises a single runner image,
+and vipsgen ships pre-generated packages for 8.16, 8.17 and 8.18, so the import
+path has to change with the installed version.
 
 ## Status
 

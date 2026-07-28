@@ -12,10 +12,16 @@
 #include <string.h>
 #include <vips/vips.h>
 
-// The floor is what CI actually tests against. Older libvips fails to link on
-// missing symbols, which is a worse error than this one.
-#if VIPS_MAJOR_VERSION < 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION < 12)
-#error "vipsx needs libvips 8.12 or newer"
+// The floor is what CI actually tests against, which is Debian 12's 8.14.
+//
+// 8.12 was tried and dropped: it links after a small amount of conditional
+// compilation, then dies with a stack smash inside libvips partway through the
+// differential suite. A binding cannot fix that from the outside, and Ubuntu
+// 22.04, the only common distribution still carrying 8.12, leaves support in
+// April 2027. Debian 12 carries 8.14 and is supported for considerably longer,
+// so that is where the line sits.
+#if VIPS_MAJOR_VERSION < 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION < 14)
+#error "vipsx needs libvips 8.14 or newer"
 #endif
 
 // The complete type surface of the libvips operation API. Every argument of
