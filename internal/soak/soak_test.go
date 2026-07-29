@@ -13,6 +13,7 @@
 package soak
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -124,6 +125,48 @@ func pipeline(path string) error {
 	}
 	viaSource.Close()
 
+	// Reader in, writer out. This one has its own way of leaking: every
+	// reader-backed source holds a registry entry on the Go side, and a Close
+	// that misses would pin the reader for the life of the process without
+	// showing up in any of libvips' counters.
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	streamed, err := vips.NewSourceFromReader(f)
+	if err != nil {
+		return err
+	}
+	defer streamed.Close()
+	fromReader, err := vips.PngloadSource(streamed, nil)
+	if err != nil {
+		return err
+	}
+	defer fromReader.Close()
+
+	var sink bytes.Buffer
+	writerTarget, err := vips.NewTargetToWriter(&sink)
+	if err != nil {
+		return err
+	}
+	defer writerTarget.Close()
+	if err := vips.JpegsaveTarget(fromReader, writerTarget, nil); err != nil {
+		return err
+	}
+	if err := writerTarget.Err(); err != nil {
+		return err
+	}
+
+	// Strip copies and removes, so it exercises the metadata path on a private
+	// header rather than a shared one.
+	bare, err := fromReader.Strip()
+	if err != nil {
+		return err
+	}
+	bare.Close()
+
 	return nil
 }
 
@@ -184,6 +227,9 @@ func TestNoGrowthUnderLoad(t *testing.T) {
 	if after.Files > before.Files {
 		t.Errorf("tracked file descriptors grew from %d to %d",
 			before.Files, after.Files)
+	}
+	if n := vips.OpenStreams(); n != 0 {
+		t.Errorf("%d reader- or writer-backed streams outlived their Close", n)
 	}
 }
 

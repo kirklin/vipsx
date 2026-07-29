@@ -327,3 +327,97 @@ func TestEXIFExcludesTheRawBlock(t *testing.T) {
 		t.Errorf("raw block: got %d bytes, want 4096", len(blob))
 	}
 }
+
+// Strip removes what an image says about itself and leaves what it is.
+func TestStripRemovesMetadataNotPixels(t *testing.T) {
+	src := loadTyped(t, "noise.png")
+
+	// Give it something to strip, on a copy so the fixture is untouched.
+	subject, err := vips.Copy(src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	subject.SetBlob("exif-data", make([]byte, 2048))
+	subject.SetString("exif-ifd0-Make", "ACME")
+	subject.SetBlob("icc-profile-data", make([]byte, 512))
+
+	before := subject.MetadataFields()
+	if len(before) < 3 {
+		t.Fatalf("expected metadata to strip, found %v", before)
+	}
+
+	stripped, err := subject.Strip()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stripped.Close()
+
+	if got := stripped.MetadataFields(); len(got) != 0 {
+		t.Errorf("Strip left %v", got)
+	}
+	if stripped.HasEXIF() || stripped.HasProfile() {
+		t.Error("Strip left EXIF or an ICC profile behind")
+	}
+	// Pixels, not encoded bytes: a PNG carries the metadata inside it, so the
+	// files differ by design. Subtracting the two images is the only comparison
+	// that answers the question actually being asked.
+	diff, err := vips.Subtract(subject, stripped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer diff.Close()
+	magnitude, err := vips.Abs(diff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer magnitude.Close()
+	worst, err := vips.Max(magnitude, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if worst != 0 {
+		t.Errorf("Strip changed the pixels, by as much as %v", worst)
+	}
+
+	// The original is untouched: Strip copies rather than mutating, because an
+	// image from an operation may be shared through the cache.
+	if len(subject.MetadataFields()) != len(before) {
+		t.Error("Strip modified the image it was called on")
+	}
+}
+
+func TestStripIsSelective(t *testing.T) {
+	src := loadTyped(t, "noise.png")
+	subject, err := vips.Copy(src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer subject.Close()
+	subject.SetBlob("exif-data", make([]byte, 128))
+	subject.SetBlob("icc-profile-data", make([]byte, 128))
+
+	partial, err := subject.Strip("exif-data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer partial.Close()
+
+	if partial.HasEXIF() {
+		t.Error("the named field survived")
+	}
+	if !partial.HasProfile() {
+		t.Error("an unnamed field was removed as well")
+	}
+}
+
+// Fields describing the pixels are refused rather than silently ignored, since
+// removing one either fails inside libvips or changes what the image is.
+func TestStripRefusesStructuralFields(t *testing.T) {
+	src := loadTyped(t, "noise.png")
+	for _, name := range []string{"width", "height", "bands", "interpretation"} {
+		if _, err := src.Strip(name); err == nil {
+			t.Errorf("Strip(%q) should have been refused", name)
+		}
+	}
+}

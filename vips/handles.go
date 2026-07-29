@@ -67,7 +67,12 @@ func (i *Interpolate) Close() { i.close() }
 
 // Source is somewhere an image can be read from. Operations whose names end in
 // _source take one.
-type Source struct{ handle }
+type Source struct {
+	handle
+	// streamID is non-zero when the bytes come from an io.Reader, and names
+	// the registry entry holding it.
+	streamID uint64
+}
 
 // NewSourceFromFile opens a file as a source.
 func NewSourceFromFile(path string) (*Source, error) {
@@ -105,14 +110,35 @@ func NewSourceFromBytes(data []byte) (*Source, error) {
 	return s, nil
 }
 
-// Close releases the source.
-func (s *Source) Close() { s.close() }
+// Close releases the source, and the reader behind it when there is one.
+func (s *Source) Close() {
+	s.close()
+	if s.streamID != 0 {
+		unregisterStream(s.streamID)
+	}
+}
+
+// Err reports the first error the underlying reader returned, if any. libvips
+// turns a failed read into an operation error of its own, which says that
+// reading failed but not why; this says why.
+func (s *Source) Err() error {
+	if s.streamID == 0 {
+		return nil
+	}
+	if st := lookupStream(s.streamID); st != nil {
+		return st.err
+	}
+	return nil
+}
 
 // Target is somewhere an image can be written to. Operations whose names end in
 // _target take one.
 type Target struct {
 	handle
 	memory bool
+	// streamID is non-zero when the bytes go to an io.Writer, and names the
+	// registry entry holding it.
+	streamID uint64
 }
 
 // NewTargetToFile creates a target writing to a file.
@@ -163,8 +189,26 @@ func (t *Target) Bytes() ([]byte, error) {
 	return C.GoBytes(p, C.int(length)), nil
 }
 
-// Close releases the target.
-func (t *Target) Close() { t.close() }
+// Close releases the target, and the writer behind it when there is one.
+func (t *Target) Close() {
+	t.close()
+	if t.streamID != 0 {
+		unregisterStream(t.streamID)
+	}
+}
+
+// Err reports the first error the underlying writer returned, if any. A save
+// through a failing writer fails as a libvips error, which reports that writing
+// failed but not why; this says why.
+func (t *Target) Err() error {
+	if t.streamID == 0 {
+		return nil
+	}
+	if st := lookupStream(t.streamID); st != nil {
+		return st.err
+	}
+	return nil
+}
 
 // SetCacheMax bounds how many built operations libvips keeps for reuse. Zero
 // disables the cache, which is what a leak check wants: a growing cache and a
