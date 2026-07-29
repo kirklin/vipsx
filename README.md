@@ -295,8 +295,8 @@ planet at the same resolution. `TILES="A1 C1"` pulls more for anyone who wants
 them. They stay outside the checkout for the reason `site/` does, and the
 download resumes, so an interrupted run costs only what it had not yet fetched.
 
-Leak checking turned out to be the thing nothing here can do, which is worth
-stating plainly rather than implying otherwise with a green badge.
+Leak checking took three attempts to get working, and the first two failures are
+worth recording because both look like a clean bill of health from outside.
 
 `go test -asan` does not run LeakSanitizer: a probe that deliberately lost two
 thousand allocations under `detect_leaks=1` reported nothing and exited zero, and
@@ -304,22 +304,32 @@ thousand allocations under `detect_leaks=1` reported nothing and exited zero, an
 make it usable, is still open. Valgrind cannot read a Go binary either — Go's
 assembly string routines read past the end of short C strings on purpose, its
 concurrent collector confuses the memory model, and its preemption signals
-collide with Valgrind's own. And the hosted CI runner cannot do it at all: a
-program containing nothing but a ten-block leak, built with clang 18 and run with
-`detect_leaks=1`, reports nothing and exits zero, because LeakSanitizer needs
-ptrace access the runner restricts and fails silently without it.
+collide with Valgrind's own.
 
-So `make cleak` builds the same C sources into a plain program and says out loud
-which half it managed. Where LeakSanitizer works it proves itself on a deliberate
-leak first and then requires a clean run; where it does not, it says so and runs
-the rest of AddressSanitizer anyway — invalid reads and writes, double frees, use
-after free — over fifty rounds through every allocating path in the C core.
+So `make cleak` builds the same C sources into a plain program with no Go runtime
+and checks that. Under clang on the CI runner that reported nothing too, even for
+a program containing only a leak; under gcc, on the same runner, it works. The
+cause was the toolchain, not the environment — an earlier version of this file
+blamed the runner's ptrace restrictions, which a container running under the
+default seccomp profile disproved.
 
-That leaves leaks covered by `internal/soak`, which watches libvips' own
-counters rather than the process heap. That is real coverage and it has caught a
-real leak, but it sees only what libvips allocates, not the plain `malloc` and
-`strdup` calls in this package. Closing that last gap needs a machine where
-LeakSanitizer runs.
+Because two of those three failures were silent, the target proves itself before
+it reports anything: it leaks a hundred allocations on purpose, requires the
+checker to catch them, and only then requires a clean run. Where no leak checker
+is available at all it says so and runs the rest of AddressSanitizer — invalid
+reads and writes, double frees, use after free — over fifty rounds through every
+allocating path in the C core.
+
+```bash
+make cleak          # needs a leak checker to do the leak half; says which it did
+make docker-cleak   # Debian 12 container, where both halves run
+make soak           # libvips' own counters, from Go
+```
+
+Between them: `internal/soak` watches libvips' allocation counters across 200
+serial and 320 concurrent rounds, which covers everything libvips allocates, and
+`make cleak` covers this package's own `malloc` and `strdup` calls, which those
+counters cannot see.
 
 ### CI
 
