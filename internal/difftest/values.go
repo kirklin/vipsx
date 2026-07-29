@@ -117,27 +117,49 @@ func formatCLI(v any) (string, bool) {
 
 // enumNick picks a member of an enum or flags type to test with.
 //
-// The first member above zero, so the value being sent is visibly different
-// from what an unset argument would produce. Above zero rather than merely
-// non-zero: several libvips enums start with a negative sentinel, and
-// VipsBandFormat's is VIPS_FORMAT_NOTSET at -1. Casting an image to that and
-// then saving it aborts the process on a libvips assertion.
-func enumNick(typeName string) (nick string, number int, ok bool) {
-	members := vips.EnumValues(typeName)
+// The operation's own default, when it has one. Choosing anything else is not
+// safe: a value can be a perfectly good member of the enum type and still be
+// one this particular operation does not handle, and libvips answers that by
+// aborting the process rather than returning an error. Two were found this way.
+// VipsBandFormat's members include VIPS_FORMAT_NOTSET at -1, and casting an
+// image to it then saving trips an assertion in header.c. VipsOperationComplex2
+// has a member complex2 does not implement, and reaching it aborts in
+// complex.c. Neither is something a binding can catch.
+//
+// Sending the default explicitly still verifies what this harness is for: the
+// value travels the whole marshalling path, and the comparison would notice if
+// it arrived as something else. It costs the ability to detect an operation
+// that ignores the argument entirely, which nothing here claimed to do.
+func enumNick(a vips.ArgSpec) (nick string, number int, ok bool) {
+	members := vips.EnumValues(a.TypeName)
 	if len(members) == 0 {
 		return "", 0, false
 	}
-	for _, m := range members {
-		if m.Value > 0 && m.Nick != "" {
-			return m.Nick, m.Value, true
+
+	want, hasDefault := a.Default.(int)
+	if hasDefault {
+		for _, m := range members {
+			if m.Value == want && m.Nick != "" {
+				return m.Nick, m.Value, true
+			}
 		}
 	}
+
+	// No usable default: the lowest member at or above zero, which is the one
+	// an operation is most likely to handle.
+	best := vips.EnumValue{Value: -1}
 	for _, m := range members {
-		if m.Value == 0 && m.Nick != "" {
-			return m.Nick, m.Value, true
+		if m.Value < 0 || m.Nick == "" {
+			continue
+		}
+		if best.Value < 0 || m.Value < best.Value {
+			best = m
 		}
 	}
-	return "", 0, false
+	if best.Nick == "" {
+		return "", 0, false
+	}
+	return best.Nick, best.Value, true
 }
 
 // optionalValueFor produces an optional argument as the command line spells it:
@@ -154,7 +176,7 @@ func optionalValueFor(a vips.ArgSpec, set *imageSet) (flags []string, arg vips.A
 		return []string{"--" + a.Name}, vips.In(a.Name, true), true
 
 	case vips.KindEnum, vips.KindFlags:
-		nick, number, found := enumNick(a.TypeName)
+		nick, number, found := enumNick(a)
 		if !found {
 			return nil, vips.Arg{}, false
 		}
@@ -207,7 +229,7 @@ func valueFor(a vips.ArgSpec, set *imageSet, outPath string) (value, bool) {
 		}, true
 
 	case vips.KindEnum, vips.KindFlags:
-		nick, number, ok := enumNick(a.TypeName)
+		nick, number, ok := enumNick(a)
 		if !ok {
 			return value{}, false
 		}
