@@ -376,7 +376,15 @@ func (im *Image) MetadataFields() []string {
 // thing receive the same object, and removing fields from it would remove them
 // from under the other caller.
 func (im *Image) Strip(fields ...string) (*Image, error) {
-	out, err := Copy(im, nil)
+	// Call rather than the generated Copy. This file is part of the layer the
+	// generator itself imports, so depending on generated code here would mean
+	// the package cannot compile with the generated files absent — and they are
+	// absent every time the generator is about to write them.
+	outs, err := Call("copy", In("in", im))
+	if err != nil {
+		return nil, err
+	}
+	out, err := outs.Image("out")
 	if err != nil {
 		return nil, err
 	}

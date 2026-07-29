@@ -1,7 +1,7 @@
 # libvips headers use -Xpreprocessor, which cgo refuses to pass on unless told.
 export CGO_CFLAGS_ALLOW = -Xpreprocessor
 
-.PHONY: all check test race cover diff soak bigdata asan cleak docker-cleak generate site check-module-size fmt vet ci
+.PHONY: all check test race cover diff soak bigdata asan cleak docker-cleak generate site check-module-size check-bootstrap fmt vet ci
 
 all: check fmt vet test
 
@@ -108,6 +108,28 @@ site:
 	go run ./examples/gallery -width 600 -format .jpg -q 90 "$(SITE_SOURCE)" site
 	@test -f site/go.mod || (echo "site/go.mod is missing; without it the images ship to every consumer" && exit 1)
 
+# The hand-written core must compile with the generated layer absent.
+#
+# The generator imports this package to ask libvips what to generate, so if
+# anything hand-written calls a generated function, the package stops compiling
+# the moment the generated files are removed — which is exactly when the
+# generator is about to write them. Strip did this once, by calling Copy.
+check-bootstrap:
+	@mkdir -p /tmp/vipsx-generated
+	@cp vips/zz_generated_*.go /tmp/vipsx-generated/
+	@rm -f vips/zz_generated_*.go
+	@if go build ./vips/ 2>/tmp/vipsx-bootstrap.log; then \
+		cp /tmp/vipsx-generated/zz_generated_*.go vips/; \
+		echo "the core compiles without the generated layer"; \
+	else \
+		cp /tmp/vipsx-generated/zz_generated_*.go vips/; \
+		echo "the core does not compile without the generated layer:"; \
+		grep -m5 "undefined" /tmp/vipsx-bootstrap.log || cat /tmp/vipsx-bootstrap.log; \
+		echo "something hand-written is calling generated code, which leaves the"; \
+		echo "generator unable to run."; \
+		exit 1; \
+	fi
+
 # Fails if the demonstration images have leaked into the module.
 check-module-size:
 	@test -f site/go.mod || (echo "site/go.mod is missing" && exit 1)
@@ -122,6 +144,6 @@ generate:
 	gofmt -w vips
 
 # Everything CI runs, minus the sanitizers.
-ci: check vet test cover race diff soak check-module-size
+ci: check vet test cover race diff soak check-module-size check-bootstrap
 	@test -z "$$(gofmt -l .)" || (echo "not gofmt-clean:"; gofmt -l .; exit 1)
 	@echo "all green"
