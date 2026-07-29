@@ -87,7 +87,7 @@ func compareLoad(t *testing.T, op, base string, spec *vips.OpSpec, fixture, dir 
 	t.Helper()
 
 	viaCLI := filepath.Join(dir, op+".cli.png")
-	if out, err := exec.Command("vips", base, fixture, viaCLI).CombinedOutput(); err != nil {
+	if out, err := runCLI(base, fixture, viaCLI); err != nil {
 		*skipped++
 		t.Skipf("the file-based sibling will not read this fixture: %s", firstLine(out))
 	}
@@ -157,7 +157,7 @@ func compareSave(t *testing.T, op, base string, spec *vips.OpSpec, fixture, dir 
 
 	ext := saverExtension(base)
 	viaCLI := filepath.Join(dir, op+".cli"+ext)
-	if out, err := exec.Command("vips", base, fixture, viaCLI).CombinedOutput(); err != nil {
+	if out, err := runCLI(base, fixture, viaCLI); err != nil {
 		*skipped++
 		t.Skipf("the file-based sibling will not write this format: %s", firstLine(out))
 	}

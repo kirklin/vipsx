@@ -2,19 +2,23 @@
 # Downloads the large NASA fixtures that the small synthetic images cannot
 # stand in for.
 #
-# Nothing here enters the repository. The imagery is public domain, but four
-# gigabytes of it in the module zip would be charged to everyone running
-# `go get` on this repository, for the same reason site/ carries its own
-# go.mod. It lands outside the checkout and the tests find it through
+# Nothing here enters the repository. The imagery is public domain, but six
+# hundred megabytes of it in the module zip would be charged to everyone
+# running `go get` on this repository, for the same reason site/ carries its
+# own go.mod. It lands outside the checkout and the tests find it through
 # VIPSX_IMAGE_DIR.
 #
-# Two formats, deliberately. Both sets are 21600x21600 RGB tiles of the same
+# One tile, two formats. Both are the same 21600x21600 RGB view of the same
 # planet, so the pixel counts match and only the container differs: PNG has no
-# random access and forces a whole-image decode, while the GeoTIFFs can be read
+# random access and forces a whole-image decode, while the GeoTIFF can be read
 # a region at a time. A loader bug that only shows up when the whole thing must
-# be held at once needs the first; the tiled read path needs the second.
+# be held at once needs the first; the tiled read path needs the second. That
+# is the whole of what these fixtures are for, and a second tile would be a
+# second crop of the same planet at the same resolution -- more bytes, no more
+# coverage. Set TILES to pull others anyway.
 #
 # Usage: internal/soak/fetch-bigdata.sh [dir]
+#        TILES="A1 C1 D1" internal/soak/fetch-bigdata.sh
 set -eu
 
 dir=${1:-${XDG_CACHE_HOME:-$HOME/.cache}/vipsx-images}
@@ -23,10 +27,11 @@ mkdir -p "$dir"
 bluemarble=https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909
 blackmarble=https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898
 
-# A2 is left out of both sets. It is the tile that is almost entirely ocean, so
-# it compresses to well under half the size of its neighbours and would not
-# exercise anything the others do not.
-tiles="A1 B1 B2 C1 C2 D1 D2"
+# The eight tiles are lettered A1 through D2. A1 is the default because it is
+# comfortably inside the size range that makes these worth having and is not
+# the mostly-ocean A2, which compresses to under half of what its neighbours
+# do. C1 is the largest of the set if a heavier one is wanted.
+tiles=${TILES:-A1}
 
 # High because a retry that is not needed costs nothing, while a link that
 # drops every few megabytes needs one attempt per few megabytes to get through

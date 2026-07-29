@@ -35,9 +35,8 @@ soak:
 	go test ./internal/soak/ -count=1 -timeout 20m
 
 # Fetches the large NASA fixtures, which are too big to keep in the repository.
-# Roughly four gigabytes, resumable, and only needed for the runs that care
-# about images the synthetic fixtures cannot imitate. See the script for what
-# it takes and why.
+# One 21600x21600 tile in two formats, about 600 MB together, resumable. See
+# the script for why those two and not more.
 BIGDATA_DIR ?= $(HOME)/.cache/vipsx-images
 bigdata:
 	./internal/soak/fetch-bigdata.sh "$(BIGDATA_DIR)"

@@ -245,13 +245,20 @@ must agree. That leaves four marginal kinds unverified: `uint64`, `refstring`,
 `[]int`, and the generic object fallback, together about twenty argument slots in
 all of libvips.
 
-Two operations are excluded automatically rather than by name. `stats` and the
-Fourier transforms reduce over the whole image with one accumulator per worker
-thread, so the low bits of the result depend on how work landed on threads. The
-harness detects this by re-running the CLI three times: if libvips disagrees with
-itself, the comparison is skipped and reported as such. Measured on this machine,
-`stats` over the same file gives the CLI eight different answers in ten runs,
-while this binding gives ten identical ones.
+Both sides run pinned to one worker thread, and neither is incidental. Several
+libvips operations reduce over the whole image with one accumulator per thread
+and combine them in completion order, so with threads free the last bit of the
+answer depends on scheduling: `stats` over the same file gives the command line
+eight different answers in ten runs. Two implementations cannot be compared for
+exactness while the implementation is free to disagree with itself, so the
+comparison removes that freedom rather than tolerating the result.
+
+What one thread does not fix is FFTW, which picks its algorithm at run time and
+does not pick the same one in every process. `phasecor` disagrees across
+processes about one run in ten, by one unit after rounding to eight bits, and
+re-sampling the command line ten times per mismatch still misses it. Those
+operations carry a named one-unit allowance with that measurement written next
+to it. Everything else is required to match to the bit.
 
 `TestNoUnknownArgumentKinds` walks every argument of every operation and fails if
 any falls outside the eighteen types the marshaller knows. A libvips upgrade that
@@ -271,7 +278,22 @@ allocation count and the descriptor count exactly where they started.
 make soak
 make asan       # Linux only, the Go toolchain has no -asan on darwin/arm64
 make cleak      # leak check the C core; needs clang
+make bigdata    # fetch the large fixtures those counters are worth watching over
 ```
+
+The soak pipeline runs on a 320x240 synthetic image, which is the right size for
+counting references two hundred times over but reaches nothing that only goes
+wrong at scale. `make bigdata` fetches one public-domain NASA tile for that, in
+two formats — 21600x21600, 274 MB as PNG and 306 MB as GeoTIFF — into
+`~/.cache/vipsx-images`, which is also what `VIPSX_IMAGE_DIR` wants pointing at.
+
+Two files rather than a set, because the formats are what differ and the pixels
+are not. A PNG has no random access and forces the whole image to be held at
+once; a GeoTIFF can be read a region at a time. Those are different paths
+through the loader, and a second tile would only be a second crop of the same
+planet at the same resolution. `TILES="A1 C1"` pulls more for anyone who wants
+them. They stay outside the checkout for the reason `site/` does, and the
+download resumes, so an interrupted run costs only what it had not yet fetched.
 
 Leak checking turned out to be the thing nothing here can do, which is worth
 stating plainly rather than implying otherwise with a green badge.
