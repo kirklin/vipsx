@@ -245,6 +245,42 @@ func (im *Image) SetBlob(name string, data []byte) {
 	runtime.KeepAlive(data)
 }
 
+// SetInts writes an array-of-int metadata field, such as the per-frame "delay"
+// of an animated image. libvips takes its own copy.
+func (im *Image) SetInts(name string, values []int) {
+	defer runtime.KeepAlive(im)
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+
+	cvals := make([]C.int, len(values))
+	for i, v := range values {
+		cvals[i] = C.int(v)
+	}
+	var p *C.int
+	if len(cvals) > 0 {
+		p = &cvals[0]
+	}
+	C.vipsx_image_set_array_int((*C.VipsImage)(im.ptr), cname, p, C.int(len(cvals)))
+}
+
+// SetFloats writes an array-of-double metadata field. libvips takes its own
+// copy.
+func (im *Image) SetFloats(name string, values []float64) {
+	defer runtime.KeepAlive(im)
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+
+	cvals := make([]C.double, len(values))
+	for i, v := range values {
+		cvals[i] = C.double(v)
+	}
+	var p *C.double
+	if len(cvals) > 0 {
+		p = &cvals[0]
+	}
+	C.vipsx_image_set_array_double((*C.VipsImage)(im.ptr), cname, p, C.int(len(cvals)))
+}
+
 // RemoveField deletes a metadata field, reporting whether it was there.
 func (im *Image) RemoveField(name string) bool {
 	defer runtime.KeepAlive(im)
@@ -323,12 +359,15 @@ func fieldErr(name string) error {
 	return fmt.Errorf("vips: no metadata field %q: %s", name, lastError())
 }
 
-// structuralFields describe the pixels rather than saying anything about where
-// they came from. Removing one either fails or changes what the image is, so
-// Strip leaves them alone.
+// structuralFields describe the image itself rather than saying anything about
+// where it came from. Removing one either fails or changes what the image is,
+// so Strip leaves them alone.
 //
 // page-height and n-pages are here because a multi-page image stops being one
-// without them, and vips-loader because libvips writes it itself.
+// without them, and vips-loader because libvips writes it itself. delay and
+// loop are here by the same logic as page geometry: an animation without its
+// timing still has every frame and plays them wrong. gif-delay and gif-loop
+// are the older spellings some loaders still set alongside them.
 var structuralFields = map[string]bool{
 	"width": true, "height": true, "bands": true,
 	"format": true, "coding": true, "interpretation": true,
@@ -336,6 +375,7 @@ var structuralFields = map[string]bool{
 	"filename": true, "vips-loader": true,
 	"n-pages": true, "page-height": true, "loader": true,
 	"concurrency": true, "background": true,
+	"delay": true, "loop": true, "gif-delay": true, "gif-loop": true,
 }
 
 // MetadataFields lists the fields carrying information about the image rather
@@ -380,6 +420,10 @@ func (im *Image) Strip(fields ...string) (*Image, error) {
 	// generator itself imports, so depending on generated code here would mean
 	// the package cannot compile with the generated files absent — and they are
 	// absent every time the generator is about to write them.
+	//
+	// The privacy of the copy rests on libvips marking copy nocache. A cached
+	// operation hands the same output to every identical call, and editing a
+	// header shared that way would be exactly the corruption described above.
 	outs, err := Call("copy", In("in", im))
 	if err != nil {
 		return nil, err
@@ -396,7 +440,7 @@ func (im *Image) Strip(fields ...string) (*Image, error) {
 		if structuralFields[name] {
 			out.Close()
 			return nil, fmt.Errorf(
-				"vips: %q describes the pixels rather than the image's history "+
+				"vips: %q describes the image itself rather than its history "+
 					"and cannot be stripped", name)
 		}
 		out.RemoveField(name)

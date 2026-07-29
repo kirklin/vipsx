@@ -421,3 +421,35 @@ func TestStripRefusesStructuralFields(t *testing.T) {
 		}
 	}
 }
+
+// Animation timing is structural: an image stripped of its provenance must
+// still play at the right speed, the same way it must still know its page
+// height. The fields are set by hand because that is what gifload sets, minus
+// the dependency on a GIF encoder being compiled in.
+func TestStripKeepsAnimationTiming(t *testing.T) {
+	im := loadTyped(t, "noise.png")
+	im.SetInts("delay", []int{40, 40, 40})
+	im.SetInt("loop", 3)
+	im.SetInt("gif-delay", 4)
+	im.SetString("comment", "shot on a potato")
+
+	bare, err := im.Strip()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bare.Close()
+
+	if got, err := bare.GetInts("delay"); err != nil || len(got) != 3 {
+		t.Errorf("Strip removed delay (%v, %v); the animation would play at the wrong speed",
+			got, err)
+	}
+	if got, err := bare.GetInt("loop"); err != nil || got != 3 {
+		t.Errorf("Strip removed or changed loop: got %d, %v", got, err)
+	}
+	if !bare.HasField("gif-delay") {
+		t.Error("Strip removed gif-delay, the legacy spelling")
+	}
+	if bare.HasField("comment") {
+		t.Error("comment survived Strip; only structural fields should")
+	}
+}

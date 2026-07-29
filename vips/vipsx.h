@@ -192,6 +192,10 @@ void vipsx_image_set_double(VipsImage *image, const char *name, double value);
 void vipsx_image_set_string(VipsImage *image, const char *name, const char *value);
 void vipsx_image_set_blob(VipsImage *image, const char *name, const void *data,
                           size_t len);
+void vipsx_image_set_array_int(VipsImage *image, const char *name,
+                               const int *values, int n);
+void vipsx_image_set_array_double(VipsImage *image, const char *name,
+                                  const double *values, int n);
 int vipsx_image_remove(VipsImage *image, const char *name);
 
 // Interpolators, sources and targets are GObjects an operation can take as an
