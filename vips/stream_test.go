@@ -18,8 +18,13 @@ type sequentialOnly struct{ r io.Reader }
 
 func (s sequentialOnly) Read(p []byte) (int, error) { return s.r.Read(p) }
 
-// failingReader reads a little and then refuses, to check that the reason
-// reaches the caller rather than being flattened into a libvips message.
+// failingReader refuses immediately, to check that the reason reaches the
+// caller rather than being flattened into a libvips message.
+//
+// Immediately, not after a few bytes: a loader handed bytes that are not the
+// format it expects gives up on its own, and never asks again, so the reader's
+// error is never the thing that stopped it. That passed on one platform and
+// failed on another until the reader was made to refuse from the start.
 type failingReader struct {
 	left int
 	err  error
@@ -162,7 +167,7 @@ func TestTargetFlushesABufferedWriter(t *testing.T) {
 func TestStreamErrorsReachTheCaller(t *testing.T) {
 	sentinel := errors.New("the network went away")
 
-	src, err := vips.NewSourceFromReader(&failingReader{left: 64, err: sentinel})
+	src, err := vips.NewSourceFromReader(&failingReader{left: 0, err: sentinel})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -72,6 +72,12 @@ jobs:
       - name: The demo images must stay out of the module
         run: make check-module-size
 
+      # The generator imports this package, so nothing hand-written may call
+      # generated code: the package would stop compiling exactly when the
+      # generated files are removed to be rewritten.
+      - name: The core must compile without the generated layer
+        run: make check-bootstrap
+
       - name: Unit tests
         run: go test ./vips/ -count=1
 
