@@ -117,6 +117,16 @@ void vipsx_image_set_blob(VipsImage *image, const char *name, const void *data,
   vips_image_set_blob(image, name, (VipsCallbackFn)g_free, copy, len);
 }
 
+void vipsx_image_set_array_int(VipsImage *image, const char *name,
+                               const int *values, int n) {
+  vips_image_set_array_int(image, name, values, n);
+}
+
+void vipsx_image_set_array_double(VipsImage *image, const char *name,
+                                  const double *values, int n) {
+  vips_image_set_array_double(image, name, values, n);
+}
+
 int vipsx_image_remove(VipsImage *image, const char *name) {
   return vips_image_remove(image, name) ? 1 : 0;
 }
