@@ -13,6 +13,12 @@ import (
 // LoaderFor reports which operation can read the given file, for example
 // "jpegload" or "pngload". libvips decides by sniffing content, not by
 // trusting the extension.
+//
+// The name is the operation nickname, the same spelling Operations and Describe
+// use, so it can be compared against them and passed to Call. libvips answers
+// this lookup with a class name instead — VipsForeignLoadHeifFile rather than
+// heifload — and both work when calling, but only one of them matches anything
+// else in this package.
 func LoaderFor(path string) (string, error) {
 	if err := Startup(); err != nil {
 		return "", err
@@ -24,7 +30,7 @@ func LoaderFor(path string) (string, error) {
 	if name == nil {
 		return "", &Error{Op: "find_load", Message: lastError()}
 	}
-	return C.GoString(name), nil
+	return C.GoString(C.vipsx_nickname_for(name)), nil
 }
 
 // LoaderForBuffer reports which operation can read the given bytes.
@@ -39,7 +45,7 @@ func LoaderForBuffer(buf []byte) (string, error) {
 	if name == nil {
 		return "", &Error{Op: "find_load_buffer", Message: lastError()}
 	}
-	return C.GoString(name), nil
+	return C.GoString(C.vipsx_nickname_for(name)), nil
 }
 
 // SaverFor reports which operation writes the given filename, chosen by its
@@ -55,7 +61,7 @@ func SaverFor(path string) (string, error) {
 	if name == nil {
 		return "", &Error{Op: "find_save", Message: lastError()}
 	}
-	return C.GoString(name), nil
+	return C.GoString(C.vipsx_nickname_for(name)), nil
 }
 
 // SaverForBuffer reports which operation writes the given format to memory.
@@ -71,7 +77,7 @@ func SaverForBuffer(suffix string) (string, error) {
 	if name == nil {
 		return "", &Error{Op: "find_save_buffer", Message: lastError()}
 	}
-	return C.GoString(name), nil
+	return C.GoString(C.vipsx_nickname_for(name)), nil
 }
 
 // LoadFile reads an image, picking the loader from the file's content. Extra

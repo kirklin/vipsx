@@ -127,7 +127,7 @@ for _, a := range spec.Args {
 ```go
 im.Fields()                    // every field the loader attached
 im.Orientation()               // EXIF orientation, 1 when absent
-im.EXIF()                      // every exif-* field as text
+im.EXIF()                      // the EXIF tags, as libvips renders them
 im.Profile()                   // embedded ICC profile
 im.HasAlpha(), im.Pages(), im.Resolution()
 

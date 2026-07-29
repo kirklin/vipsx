@@ -381,6 +381,63 @@ func fourierNoise(op string) float64 {
 	return 0
 }
 
+// bindingIsStable reports whether the binding agrees with itself on an
+// operation, by running it again in this process.
+//
+// The other half of oracleIsStable. A mismatch means one of two things: the
+// binding is wrong, or one of the two sides is not reproducible. Asking only
+// the command line answers half the question and leaves a rare disagreement
+// looking like a defect with no evidence either way.
+func bindingIsStable(t *testing.T, p plan, dir string, first string) (bool, float64) {
+	t.Helper()
+	const reruns = 5
+	worst := 0.0
+	for i := range reruns {
+		again := filepath.Join(dir, fmt.Sprintf("%s.gorecheck%d.png", p.op, i))
+
+		args := p.callArgs
+		if p.savesToFile {
+			again = filepath.Join(dir, fmt.Sprintf("%s.gorecheck%d%s", p.op, i, saverExtension(p.op)))
+			args = make([]vips.Arg, len(p.callArgs))
+			copy(args, p.callArgs)
+			for j, a := range args {
+				if a.Name() == "filename" {
+					args[j] = vips.In("filename", again)
+				}
+			}
+		}
+
+		outs, err := vips.Call(p.op, args...)
+		if err != nil {
+			t.Fatalf("re-running the binding: %v", err)
+		}
+		if !p.savesToFile {
+			im, err := outs.Image(p.outName)
+			if err != nil {
+				outs.Close()
+				t.Fatalf("re-running the binding: %v", err)
+			}
+			if err := vips.Pngsave(im, again, nil); err != nil {
+				outs.Close()
+				t.Fatalf("re-running the binding: %v", err)
+			}
+		}
+		outs.Close()
+
+		var d float64
+		if p.savesToFile {
+			d, _, err = compareSaved(first, again)
+		} else {
+			d, err = maxAbsDiff(first, again)
+		}
+		if err != nil {
+			t.Fatalf("comparing two binding runs: %v", err)
+		}
+		worst = max(worst, d)
+	}
+	return worst == 0, worst
+}
+
 // oracleIsStable reports whether the CLI agrees with itself on an operation.
 //
 // Some libvips operations reduce over the whole image with one accumulator per
@@ -557,14 +614,18 @@ func compareAll(t *testing.T, dir string, paths []string, ops []string) {
 			t.Skipf("within FFTW's planning noise: differs by %v, allowed %v",
 				diff, allowed)
 		}
-		if stable, selfDiff := oracleIsStable(t, p, dir); !stable {
+		// A mismatch is only evidence against the binding once both sides have
+		// been shown to repeat themselves. Ask each of them.
+		cliStable, cliDrift := oracleIsStable(t, p, dir)
+		goStable, goDrift := bindingIsStable(t, p, dir, viaGo)
+		if !cliStable || !goStable {
 			unstable++
-			t.Skipf("libvips is not reproducible here: CLI runs differ by %v, "+
-				"binding differs from the first by %v", selfDiff, diff)
+			t.Skipf("not reproducible: the CLI drifts by %v across runs, the binding "+
+				"by %v, and they differ from each other by %v", cliDrift, goDrift, diff)
 		}
 		mismatched++
-		t.Errorf("pixels differ from a reproducible CLI result, "+
-			"max absolute difference %v", diff)
+		t.Errorf("pixels differ by %v, and both sides repeat themselves exactly, "+
+			"so this is the binding disagreeing with libvips rather than noise", diff)
 	}
 
 	for _, op := range ops {
