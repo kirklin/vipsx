@@ -445,3 +445,6 @@ func asImageSlice(v any) ([]*Image, bool) {
 	}
 	return nil, false
 }
+
+// Name reports which libvips argument this refers to.
+func (a Arg) Name() string { return a.name }

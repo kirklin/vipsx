@@ -1,7 +1,7 @@
 # libvips headers use -Xpreprocessor, which cgo refuses to pass on unless told.
 export CGO_CFLAGS_ALLOW = -Xpreprocessor
 
-.PHONY: all check test race cover diff soak asan cleak generate site check-module-size fmt vet ci
+.PHONY: all check test race cover diff soak bigdata asan cleak generate site check-module-size fmt vet ci
 
 all: check fmt vet test
 
@@ -33,6 +33,14 @@ diff:
 # Leak and lifetime checks against libvips' own allocation counters.
 soak:
 	go test ./internal/soak/ -count=1 -timeout 20m
+
+# Fetches the large NASA fixtures, which are too big to keep in the repository.
+# Roughly four gigabytes, resumable, and only needed for the runs that care
+# about images the synthetic fixtures cannot imitate. See the script for what
+# it takes and why.
+BIGDATA_DIR ?= $(HOME)/.cache/vipsx-images
+bigdata:
+	./internal/soak/fetch-bigdata.sh "$(BIGDATA_DIR)"
 
 # A leak check for the C core, with no Go runtime to confuse the checker.
 #
