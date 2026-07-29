@@ -5,6 +5,16 @@
 
 // libvips names its loaders and savers after the operation that does the work,
 // so these return something that can be handed straight to vipsx_call.
+const char *vipsx_nickname_for(const char *class_name) {
+  if (!class_name)
+    return NULL;
+  GType type = g_type_from_name(class_name);
+  if (type == 0)
+    return class_name; // not a registered class; hand it back unchanged
+  const char *nickname = vips_nickname_find(type);
+  return nickname ? nickname : class_name;
+}
+
 const char *vipsx_find_load(const char *filename) {
   return vips_foreign_find_load(filename);
 }

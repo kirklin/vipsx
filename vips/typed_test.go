@@ -1,6 +1,7 @@
 package vips_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -234,5 +235,95 @@ func TestMetadata(t *testing.T) {
 	}
 	if src.Pages() != 1 {
 		t.Errorf("pages: got %d, want 1", src.Pages())
+	}
+}
+
+// Every name this package hands out is an operation nickname, the spelling
+// Operations and Describe use. libvips answers the loader lookup with a class
+// name instead, and both work when calling, so the mismatch was invisible until
+// something tried to compare the two.
+func TestLookupsReturnOperationNames(t *testing.T) {
+	known := map[string]bool{}
+	for _, op := range vips.Operations() {
+		known[op] = true
+	}
+
+	src := filepath.Join("testdata", "noise.png")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lookups := []struct {
+		what string
+		get  func() (string, error)
+	}{
+		{"LoaderFor", func() (string, error) { return vips.LoaderFor(src) }},
+		{"LoaderForBuffer", func() (string, error) { return vips.LoaderForBuffer(data) }},
+		{"SaverFor", func() (string, error) { return vips.SaverFor("out.webp") }},
+		{"SaverForBuffer", func() (string, error) { return vips.SaverForBuffer(".jpg") }},
+	}
+
+	for _, l := range lookups {
+		name, err := l.get()
+		if err != nil {
+			t.Errorf("%s: %v", l.what, err)
+			continue
+		}
+		if !known[name] {
+			t.Errorf("%s returned %q, which is not an operation name; "+
+				"it cannot be compared against Operations or Describe", l.what, name)
+		}
+		if _, err := vips.Describe(name); err != nil {
+			t.Errorf("%s returned %q, which Describe rejects: %v", l.what, name, err)
+		}
+	}
+
+	// The specific case that started this: a HEIC file.
+	if name, err := vips.LoaderFor(src); err == nil && name != "pngload" {
+		t.Errorf("LoaderFor on a PNG: got %q, want pngload", name)
+	}
+}
+
+// EXIF reports tags. The undecoded EXIF segment shares their prefix and is a
+// few kilobytes of binary, which rendered as text is thousands of characters of
+// base64 sitting in the map beside the real tags.
+func TestEXIFExcludesTheRawBlock(t *testing.T) {
+	src := loadTyped(t, "noise.png")
+
+	// The fixture carries no EXIF, so give it some, including a raw block.
+	own, err := vips.Copy(src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer own.Close()
+
+	own.SetString("exif-ifd0-Make", "ACME (ACME, ASCII, 4 components, 4 bytes)")
+	own.SetBlob("exif-data", make([]byte, 4096))
+
+	exif := own.EXIF()
+	if _, ok := exif["exif-data"]; ok {
+		t.Error("EXIF included the raw exif-data block, which is not a tag")
+	}
+	if got := exif["exif-ifd0-Make"]; got == "" {
+		t.Error("EXIF dropped a real tag")
+	}
+	for name, value := range exif {
+		if len(value) > 2048 {
+			t.Errorf("EXIF value for %q is %d characters; a tag should not be that large",
+				name, len(value))
+		}
+	}
+
+	// The bytes are still reachable, just not pretending to be a tag.
+	if !own.HasEXIF() {
+		t.Error("HasEXIF should still see the block")
+	}
+	blob, err := own.GetBlob("exif-data")
+	if err != nil {
+		t.Fatalf("GetBlob should still return the raw block: %v", err)
+	}
+	if len(blob) != 4096 {
+		t.Errorf("raw block: got %d bytes, want 4096", len(blob))
 	}
 }

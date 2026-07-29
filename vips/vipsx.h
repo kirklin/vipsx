@@ -150,6 +150,11 @@ void vipsx_enum_values_free(VipsxEnumValue *values, int count);
 // Loader and saver selection. These are not operations, they are the lookup
 // libvips uses to decide which operation can read or write a given thing, so
 // they have to be called directly rather than through vipsx_call.
+//
+// They answer with a GObject class name such as VipsForeignLoadHeifFile, while
+// everything else in this package speaks operation nicknames such as heifload.
+// vipsx_nickname_for translates, so callers only ever see one naming scheme.
+const char *vipsx_nickname_for(const char *class_name);
 const char *vipsx_find_load(const char *filename);
 const char *vipsx_find_load_buffer(const void *buf, size_t len);
 const char *vipsx_find_save(const char *filename);

@@ -285,13 +285,28 @@ func (im *Image) HasProfile() bool { return im.HasField("icc-profile-data") }
 func (im *Image) Profile() ([]byte, error) { return im.GetBlob("icc-profile-data") }
 
 // HasEXIF reports whether EXIF data is present.
-func (im *Image) HasEXIF() bool { return im.HasField("exif-data") }
+func (im *Image) HasEXIF() bool { return im.HasField(exifRawBlock) }
 
-// EXIF returns every exif-* field rendered as text, keyed by field name.
+// EXIF returns every EXIF tag rendered as text, keyed by field name.
+//
+// The raw exif-data block is not among them. It is a few kilobytes of binary
+// that happens to share the exif- prefix, and rendering it as text produces
+// several thousand characters of base64 sitting in the map next to the tags.
+// Read it with GetBlob("exif-data") when the bytes themselves are wanted.
+//
+// Values arrive in libvips' own rendering, which appends a description of the
+// stored type:
+//
+//	exif-ifd0-Make → "NIKON CORPORATION (NIKON CORPORATION, ASCII, 18 components, 18 bytes)"
+//
+// They are handed over unchanged. Splitting on the first " (" would tidy most of
+// them and silently truncate any tag whose value contains a bracket, which user
+// comments and lens names do, so the choice of how to parse is left to whoever
+// knows what is in their files.
 func (im *Image) EXIF() map[string]string {
 	out := map[string]string{}
 	for _, name := range im.Fields() {
-		if len(name) < 5 || name[:5] != "exif-" {
+		if len(name) < 5 || name[:5] != "exif-" || name == exifRawBlock {
 			continue
 		}
 		if v, err := im.GetAsString(name); err == nil {
@@ -300,6 +315,9 @@ func (im *Image) EXIF() map[string]string {
 	}
 	return out
 }
+
+// exifRawBlock is the field holding the undecoded EXIF segment.
+const exifRawBlock = "exif-data"
 
 func fieldErr(name string) error {
 	return fmt.Errorf("vips: no metadata field %q: %s", name, lastError())
