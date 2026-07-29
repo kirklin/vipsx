@@ -3,6 +3,7 @@ package vips_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kirklin/vipsx/vips"
@@ -451,5 +452,36 @@ func TestStripKeepsAnimationTiming(t *testing.T) {
 	}
 	if bare.HasField("comment") {
 		t.Error("comment survived Strip; only structural fields should")
+	}
+}
+
+// PackageVersion is checked against the tag by CI, which cannot help a
+// developer who has just typed it wrong. This catches the shape before then.
+func TestPackageVersionIsWellFormed(t *testing.T) {
+	v := vips.PackageVersion
+	if v == "" {
+		t.Fatal("PackageVersion is empty")
+	}
+	if v[0] == 'v' {
+		t.Errorf("PackageVersion is %q; it should not carry the leading v that "+
+			"the git tag does", v)
+	}
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		t.Fatalf("PackageVersion is %q; want major.minor.patch", v)
+	}
+	for _, p := range parts {
+		if p == "" {
+			t.Fatalf("PackageVersion is %q; a component is empty", v)
+		}
+		for _, r := range p {
+			if r < '0' || r > '9' {
+				// A pre-release suffix on the patch component is fine.
+				if strings.ContainsAny(p, "-+") {
+					break
+				}
+				t.Fatalf("PackageVersion is %q; %q is not a number", v, p)
+			}
+		}
 	}
 }

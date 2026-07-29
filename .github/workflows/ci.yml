@@ -3,6 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -136,6 +137,28 @@ jobs:
 
       - name: Memory soak
         run: go test ./internal/soak/ -count=1 -timeout 20m -v
+
+  # A version written in two places can disagree, and a version file that
+  # quietly disagrees with the tag is worse than not having one. This is the
+  # only thing that stops it: on a tagged build, the tag and the constant must
+  # be the same string.
+  version:
+    name: the tag and PackageVersion must agree
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          declared=$(sed -n 's/^const PackageVersion = "\(.*\)"$/\1/p' vips/version.go)
+          echo "tag: $tag"
+          echo "vips/version.go: $declared"
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::the tag says $tag and vips/version.go says $declared"
+            exit 1
+          fi
+          echo "they agree"
 
   # The generator reads the installed libvips, so its output is different on
   # every version above. What has to hold everywhere is that generation
