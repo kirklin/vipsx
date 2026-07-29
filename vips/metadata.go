@@ -322,3 +322,76 @@ const exifRawBlock = "exif-data"
 func fieldErr(name string) error {
 	return fmt.Errorf("vips: no metadata field %q: %s", name, lastError())
 }
+
+// structuralFields describe the pixels rather than saying anything about where
+// they came from. Removing one either fails or changes what the image is, so
+// Strip leaves them alone.
+//
+// page-height and n-pages are here because a multi-page image stops being one
+// without them, and vips-loader because libvips writes it itself.
+var structuralFields = map[string]bool{
+	"width": true, "height": true, "bands": true,
+	"format": true, "coding": true, "interpretation": true,
+	"xoffset": true, "yoffset": true, "xres": true, "yres": true,
+	"filename": true, "vips-loader": true,
+	"n-pages": true, "page-height": true, "loader": true,
+	"concurrency": true, "background": true,
+}
+
+// MetadataFields lists the fields carrying information about the image rather
+// than describing its pixels: EXIF, XMP, IPTC, the ICC profile, the orientation
+// tag, and whatever else a loader attached.
+//
+// This is what Strip removes when given no arguments.
+func (im *Image) MetadataFields() []string {
+	var out []string
+	for _, name := range im.Fields() {
+		if !structuralFields[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// Strip returns a copy of the image with metadata removed. Given no arguments
+// it removes everything MetadataFields reports; given names, only those.
+//
+// Two of the fields it removes change how the result looks, and neither is
+// obvious:
+//
+// Removing "orientation" does not straighten anything. A photograph from a
+// phone is stored sideways with a tag saying which way up it goes, and dropping
+// the tag leaves it sideways for good. Call Autorot first, which applies the
+// rotation and then clears the tag.
+//
+// Removing "icc-profile-data" changes the colours of anything not already in
+// sRGB, because the numbers stay and the note explaining them goes. Convert
+// with colourspace first, or keep the profile.
+//
+//	own, err := vips.Autorot(im)          // apply the rotation
+//	own, err = own.Strip()                // then drop everything
+//
+// A copy, not the image itself. An image that came out of an operation may be
+// shared: libvips caches built operations, so two callers asking for the same
+// thing receive the same object, and removing fields from it would remove them
+// from under the other caller.
+func (im *Image) Strip(fields ...string) (*Image, error) {
+	out, err := Copy(im, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(fields) == 0 {
+		fields = out.MetadataFields()
+	}
+	for _, name := range fields {
+		if structuralFields[name] {
+			out.Close()
+			return nil, fmt.Errorf(
+				"vips: %q describes the pixels rather than the image's history "+
+					"and cannot be stripped", name)
+		}
+		out.RemoveField(name)
+	}
+	return out, nil
+}

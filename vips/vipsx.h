@@ -197,6 +197,13 @@ int vipsx_image_remove(VipsImage *image, const char *name);
 // Interpolators, sources and targets are GObjects an operation can take as an
 // argument, so they need constructors of their own.
 VipsInterpolate *vipsx_interpolate_new(const char *nickname);
+
+// Custom sources and targets, which call back into Go for their bytes. The id
+// selects which reader or writer; see stream.c for why it is a number and not a
+// pointer. A source with seekable set to zero gets no seek handler at all,
+// which is how libvips is told to take its sequential path.
+VipsSourceCustom *vipsx_source_custom_new(guint64 id, int seekable);
+VipsTargetCustom *vipsx_target_custom_new(guint64 id);
 VipsSource *vipsx_source_new_from_file(const char *filename);
 VipsSource *vipsx_source_new_from_memory(const void *data, size_t len);
 VipsTarget *vipsx_target_new_to_file(const char *filename);

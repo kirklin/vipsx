@@ -52,11 +52,17 @@ bigdata:
 # the container overrides this rather than installing a second toolchain.
 CLEAK_CC ?= clang
 CLEAK_CFLAGS = -g -O1 -fsanitize=address -fno-omit-frame-pointer -Ivips
+
+# Everything except stream.c, which calls into Go through the header cgo
+# generates and therefore cannot be compiled without it. Nothing it contains is
+# reachable from a program with no Go in it anyway: the custom source and target
+# exist to hand bytes to an io.Reader.
+CLEAK_SOURCES = $(filter-out vips/stream.c,$(wildcard vips/*.c))
 cleak:
 	@which $(CLEAK_CC) >/dev/null || \
 		(echo "$(CLEAK_CC) is needed for -fsanitize=address" && exit 1)
 	$(CLEAK_CC) $(CLEAK_CFLAGS) $$(pkg-config --cflags vips) \
-		vips/*.c internal/cleak/main.c \
+		$(CLEAK_SOURCES) internal/cleak/main.c \
 		$$(pkg-config --libs vips) -o /tmp/vipsx-cleak
 	@echo "--- can this machine detect leaks at all? ---"
 	@ASAN_OPTIONS=detect_leaks=1 LSAN_OPTIONS=exitcode=23 \

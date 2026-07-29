@@ -140,16 +140,56 @@ The copy matters. libvips caches built operations, so two callers asking for the
 same thing get the same object back; mutating that header from more than one
 goroutine corrupts the field list.
 
-Streaming goes through sources and targets:
+Removing metadata is its own step, because two of the fields change how the
+result looks and neither is obvious:
 
 ```go
-src, _ := vips.NewSourceFromFile("in.jpg")
+fields := im.MetadataFields()   // EXIF, XMP, IPTC, ICC, orientation, the rest
+own, err := im.Strip()          // all of them, on a copy
+own, err := im.Strip("exif-data", "xmp-data")   // or only these
+```
+
+On a photograph from a phone, that is the difference between shipping the
+camera's serial number, the lens model and the timestamp to whoever downloads
+the image, and not. On one 800px JPEG here it also took 64 KB down to 35 KB.
+
+`Strip` copies rather than mutating, for the reason above: an image from an
+operation may be shared. It refuses fields that describe the pixels — width,
+interpretation and the like — rather than failing obscurely inside libvips.
+
+Two of its removals need care. Dropping `orientation` does not straighten
+anything: a phone stores the photograph sideways with a tag saying which way up
+it goes, so losing the tag leaves it sideways for good. Call `Autorot` first,
+which applies the rotation and then clears the tag. Dropping
+`icc-profile-data` changes the colours of anything not already in sRGB, because
+the numbers stay and the note explaining them goes.
+
+### Streaming
+
+Sources and targets read and write without materialising the whole image. They
+can be a file, a byte slice, memory, or any `io.Reader` and `io.Writer`:
+
+```go
+src, _ := vips.NewSourceFromReader(req.Body)   // no temporary file
+defer src.Close()
 im, _ := vips.JpegloadSource(src, nil)
 
-target, _ := vips.NewTargetToMemory()
+target, _ := vips.NewTargetToWriter(w)         // straight to the response
+defer target.Close()
 _ = vips.WebpsaveTarget(im, target, nil)
-buf, _ := target.Bytes()
+if err := target.Err(); err != nil { ... }     // what the writer said
 ```
+
+A reader that also seeks is used as one, and libvips reads the file the way it
+would a real one. A reader that cannot — an HTTP body, a pipe — makes libvips
+take its sequential path and buffer what it needs instead. Both work; the
+seekable one works for more formats, since a few loaders cannot operate without
+seeking.
+
+`Close` is not optional here. Until it is called the stream stays registered so
+libvips can call back into it, which pins the reader or writer.
+`vips.OpenStreams()` reports how many are outstanding and should return to
+zero; the soak suite asserts exactly that.
 
 ### Runtime controls
 
