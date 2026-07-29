@@ -17,10 +17,15 @@ import (
 // with no way to carry a Go pointer: cgo forbids storing one there. So each
 // stream is registered under a number, and only the number crosses over.
 //
-// The registry also decides lifetime. An entry lives until the Source or Target
-// is closed, which is why closing one is not optional when a reader or writer
-// is involved — the entry, and the reader it holds, would otherwise outlive
-// every reference the caller has.
+// The entry is removed at Close, deterministically, rather than when libvips
+// lets go of the C object. Letting the object decide was tried and measured:
+// evaluating an image drags internal operations into the libvips operation
+// cache, the cache holds the pipeline, the pipeline holds the source, and the
+// reader stays pinned until an eviction that may never come. Close severing
+// the registry frees the reader on the spot; a callback arriving afterwards
+// finds nothing and fails the operation cleanly. The C object also carries a
+// weak reference as a backstop, so a handle that is never closed still has its
+// entry removed when the collector and libvips are both done with it.
 var (
 	streamsMu sync.RWMutex
 	streams   = map[uint64]*stream{}
@@ -28,24 +33,45 @@ var (
 )
 
 type stream struct {
+	id     uint64
 	reader io.Reader
 	seeker io.Seeker
 	writer io.Writer
-	err    error // the first failure, kept so Close can report it
+
+	// err is written from whichever thread libvips calls back on and read from
+	// whatever goroutine asks Err, so it takes a lock rather than a comment
+	// about who may touch it when.
+	mu  sync.Mutex
+	err error // the first failure, kept for Err to report
+}
+
+// setErr keeps the first error. Later ones are usually consequences of it.
+func (s *stream) setErr(err error) {
+	s.mu.Lock()
+	if s.err == nil {
+		s.err = err
+	}
+	s.mu.Unlock()
+}
+
+func (s *stream) firstErr() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.err
 }
 
 func registerStream(s *stream) uint64 {
-	id := streamID.Add(1)
+	s.id = streamID.Add(1)
 	streamsMu.Lock()
-	streams[id] = s
+	streams[s.id] = s
 	streamsMu.Unlock()
-	return id
+	return s.id
 }
 
 // OpenStreams reports how many reader- or writer-backed sources and targets are
 // still registered. It should return to zero once everything is closed; a
 // number that only grows means Close is being skipped somewhere, and each
-// missed one pins a reader or writer for the life of the process.
+// missed one pins a reader or writer until the collector gets to the handle.
 func OpenStreams() int {
 	streamsMu.RLock()
 	defer streamsMu.RUnlock()
@@ -58,12 +84,10 @@ func lookupStream(id uint64) *stream {
 	return streams[id]
 }
 
-func unregisterStream(id uint64) *stream {
+func unregisterStream(id uint64) {
 	streamsMu.Lock()
-	defer streamsMu.Unlock()
-	s := streams[id]
 	delete(streams, id)
-	return s
+	streamsMu.Unlock()
 }
 
 //export vipsxGoRead
@@ -75,16 +99,20 @@ func vipsxGoRead(id C.guint64, buffer unsafe.Pointer, length C.gint64) C.gint64 
 
 	n, err := s.reader.Read(unsafe.Slice((*byte)(buffer), int(length)))
 	if n > 0 {
-		// A short read is not an error to libvips; it asks again.
+		// A short read is not an error to libvips; it asks again. The error
+		// still has to be kept now: a reader that hands over its last bytes
+		// alongside the failure is not obliged to repeat itself when asked
+		// again, and the reason would otherwise be gone.
+		if err != nil && err != io.EOF {
+			s.setErr(err)
+		}
 		return C.gint64(n)
 	}
 	if err == io.EOF {
 		return 0
 	}
 	if err != nil {
-		if s.err == nil {
-			s.err = err
-		}
+		s.setErr(err)
 		return -1
 	}
 	return 0
@@ -98,9 +126,7 @@ func vipsxGoSeek(id C.guint64, offset C.gint64, whence C.int) C.gint64 {
 	}
 	pos, err := s.seeker.Seek(int64(offset), int(whence))
 	if err != nil {
-		if s.err == nil {
-			s.err = err
-		}
+		s.setErr(err)
 		return -1
 	}
 	return C.gint64(pos)
@@ -114,9 +140,7 @@ func vipsxGoWrite(id C.guint64, data unsafe.Pointer, length C.gint64) C.gint64 {
 	}
 	n, err := s.writer.Write(unsafe.Slice((*byte)(data), int(length)))
 	if err != nil {
-		if s.err == nil {
-			s.err = err
-		}
+		s.setErr(err)
 		return -1
 	}
 	return C.gint64(n)
@@ -130,13 +154,21 @@ func vipsxGoEnd(id C.guint64) C.int {
 	}
 	if f, ok := s.writer.(interface{ Flush() error }); ok {
 		if err := f.Flush(); err != nil {
-			if s.err == nil {
-				s.err = err
-			}
+			s.setErr(err)
 			return -1
 		}
 	}
 	return 0
+}
+
+// vipsxGoStreamGone runs when the C object dies, from the weak reference the
+// constructor took. Close has usually unregistered the entry already and this
+// finds nothing to do; it exists for the handle that is never closed, whose
+// entry would otherwise outlive every reference the caller has.
+//
+//export vipsxGoStreamGone
+func vipsxGoStreamGone(id C.guint64) {
+	unregisterStream(uint64(id))
 }
 
 // NewSourceFromReader reads an image from r as libvips asks for it, without
@@ -148,8 +180,14 @@ func vipsxGoEnd(id C.guint64) C.int {
 // needs. Both work; the seekable one works for more formats, since a few
 // loaders cannot operate without seeking.
 //
-// Close releases the source and forgets r. It is not optional: until it is
-// called, the registry holds a reference to r for libvips to call back into.
+// Close releases r immediately, so it must come after every image loaded from
+// the source has been evaluated or closed — save first, then close. This is
+// one place a reader-backed source is stricter than a file-backed one: a file
+// stays readable through libvips' own reference after the handle closes, while
+// a demand for bytes after this Close fails the operation. It fails cleanly,
+// with an error rather than anything worse, but the error is libvips' generic
+// read failure and does not name the cause. r itself is never closed here;
+// that stays with whoever opened it.
 func NewSourceFromReader(r io.Reader) (*Source, error) {
 	if err := Startup(); err != nil {
 		return nil, err
@@ -168,22 +206,25 @@ func NewSourceFromReader(r io.Reader) (*Source, error) {
 
 	p := C.vipsx_source_custom_new(C.guint64(id), C.int(seekable))
 	if p == nil {
+		// No object was made, so no weak reference will ever fire.
 		unregisterStream(id)
 		return nil, &Error{Op: "source", Message: lastError()}
 	}
 
-	src := &Source{streamID: id}
+	src := &Source{st: st}
 	src.init(unsafe.Pointer(p))
 	return src, nil
 }
 
 // NewTargetToWriter writes an image to w as libvips produces it.
 //
-// If w has a Flush method it is called when libvips finishes, so a
-// bufio.Writer does not need flushing separately.
+// If w has a Flush method returning an error it is called when libvips
+// finishes, so a bufio.Writer does not need flushing separately.
 //
-// Close releases the target and forgets w, and reports the first error the
-// writer returned. Ignoring it discards write failures.
+// A save through a failing writer fails as a libvips error, which says that
+// writing failed but not why. Err says why, and keeps saying it after Close,
+// so checking it after a failed save is enough — deferring Close does not
+// discard the reason.
 func NewTargetToWriter(w io.Writer) (*Target, error) {
 	if err := Startup(); err != nil {
 		return nil, err
@@ -192,7 +233,8 @@ func NewTargetToWriter(w io.Writer) (*Target, error) {
 		return nil, &Error{Op: "target", Message: "nil writer"}
 	}
 
-	id := registerStream(&stream{writer: w})
+	st := &stream{writer: w}
+	id := registerStream(st)
 
 	p := C.vipsx_target_custom_new(C.guint64(id))
 	if p == nil {
@@ -200,7 +242,7 @@ func NewTargetToWriter(w io.Writer) (*Target, error) {
 		return nil, &Error{Op: "target", Message: lastError()}
 	}
 
-	t := &Target{streamID: id}
+	t := &Target{st: st}
 	t.init(unsafe.Pointer(p))
 	return t, nil
 }

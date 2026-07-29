@@ -244,6 +244,85 @@ func TestReaderToWriterRoundTrip(t *testing.T) {
 	}
 }
 
+// The reason must survive Close. A caller that defers Close and checks Err on
+// the way out is the ordinary shape, not a mistake, and the error it is owed
+// must not vanish because the handle went first.
+func TestStreamErrSurvivesClose(t *testing.T) {
+	sentinel := errors.New("disk full")
+
+	target, err := vips.NewTargetToWriter(failingWriter{err: sentinel})
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := loadTyped(t, "noise.png")
+	if err := vips.JpegsaveTarget(im, target, nil); err == nil {
+		t.Fatal("expected the save to fail")
+	}
+	target.Close()
+	if got := target.Err(); !errors.Is(got, sentinel) {
+		t.Errorf("Target.Err after Close: got %v, want %v", got, sentinel)
+	}
+
+	src, err := vips.NewSourceFromReader(&failingReader{left: 0, err: sentinel})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vips.PngloadSource(src, nil); err == nil {
+		t.Fatal("expected the load to fail")
+	}
+	src.Close()
+	if got := src.Err(); !errors.Is(got, sentinel) {
+		t.Errorf("Source.Err after Close: got %v, want %v", got, sentinel)
+	}
+}
+
+// Closing the source before an image loaded from it has been evaluated severs
+// the stream: the reader is released at Close, deterministically, and an
+// operation that demands bytes afterwards fails cleanly rather than reaching a
+// reader the caller was told is free. The other lifetime — keeping the entry
+// until libvips drops the object — was tried and measured: evaluating an image
+// drags internal operations into the libvips operation cache, which then pins
+// the reader until an eviction that may never come.
+func TestCloseSeversTheStream(t *testing.T) {
+	// Big enough that loading the header cannot have buffered the whole file,
+	// or the save below would succeed from memory and prove nothing.
+	noise, err := vips.Gaussnoise(600, 600, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer noise.Close()
+	path := filepath.Join(t.TempDir(), "big.png")
+	if err := vips.Pngsave(noise, path, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	before := vips.OpenStreams()
+	src, err := vips.NewSourceFromReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	im, err := vips.PngloadSource(src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer im.Close()
+
+	src.Close()
+	if n := vips.OpenStreams(); n != before {
+		t.Errorf("the reader is still registered after Close: %d streams, want %d",
+			n, before)
+	}
+	if _, err := vips.SaveBuffer(im, ".png"); err == nil {
+		t.Error("evaluating after Close should fail; the reader was released at Close")
+	}
+}
+
 // Closing must release the registry entry, or every stream ever opened stays
 // reachable for the life of the process along with its reader.
 func TestClosingAStreamReleasesIt(t *testing.T) {
