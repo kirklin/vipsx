@@ -31,6 +31,16 @@ static int vipsx_on_end(VipsTargetCustom *target, gpointer user) {
   return vipsxGoEnd((guint64)GPOINTER_TO_SIZE(user));
 }
 
+// A backstop for handles that are never closed. Close removes the registry
+// entry itself; when Close is skipped, the entry would outlive every reference
+// the caller has and pin the reader for the life of the process. The weak
+// reference fires when the object is finalized — collector and libvips both
+// done — and removes what Close did not.
+static void vipsx_stream_gone(gpointer user, GObject *where) {
+  (void)where;
+  vipsxGoStreamGone((guint64)GPOINTER_TO_SIZE(user));
+}
+
 // vipsx_source_custom_new builds a source that pulls from Go.
 //
 // seekable decides whether the seek handler is connected at all. That is not a
@@ -48,6 +58,8 @@ VipsSourceCustom *vipsx_source_custom_new(guint64 id, int seekable) {
   if (seekable)
     g_signal_connect(source, "seek", G_CALLBACK(vipsx_on_seek),
                      GSIZE_TO_POINTER((gsize)id));
+  g_object_weak_ref(G_OBJECT(source), vipsx_stream_gone,
+                    GSIZE_TO_POINTER((gsize)id));
 
   return source;
 }
@@ -61,6 +73,8 @@ VipsTargetCustom *vipsx_target_custom_new(guint64 id) {
                    GSIZE_TO_POINTER((gsize)id));
   g_signal_connect(target, "end", G_CALLBACK(vipsx_on_end),
                    GSIZE_TO_POINTER((gsize)id));
+  g_object_weak_ref(G_OBJECT(target), vipsx_stream_gone,
+                    GSIZE_TO_POINTER((gsize)id));
 
   return target;
 }

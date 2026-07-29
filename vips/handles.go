@@ -69,9 +69,10 @@ func (i *Interpolate) Close() { i.close() }
 // _source take one.
 type Source struct {
 	handle
-	// streamID is non-zero when the bytes come from an io.Reader, and names
-	// the registry entry holding it.
-	streamID uint64
+	// st is non-nil when the bytes come from an io.Reader. It lives on the
+	// handle rather than only in the registry so Err keeps working after
+	// Close; the registry entry itself lasts as long as the C object does.
+	st *stream
 }
 
 // NewSourceFromFile opens a file as a source.
@@ -110,25 +111,24 @@ func NewSourceFromBytes(data []byte) (*Source, error) {
 	return s, nil
 }
 
-// Close releases the source, and the reader behind it when there is one.
+// Close releases the source, and the reader behind it when there is one. Any
+// image loaded from the source must be evaluated or closed first; a demand for
+// bytes after this fails its operation.
 func (s *Source) Close() {
 	s.close()
-	if s.streamID != 0 {
-		unregisterStream(s.streamID)
+	if s.st != nil {
+		unregisterStream(s.st.id)
 	}
 }
 
 // Err reports the first error the underlying reader returned, if any. libvips
 // turns a failed read into an operation error of its own, which says that
-// reading failed but not why; this says why.
+// reading failed but not why; this says why. It keeps answering after Close.
 func (s *Source) Err() error {
-	if s.streamID == 0 {
+	if s.st == nil {
 		return nil
 	}
-	if st := lookupStream(s.streamID); st != nil {
-		return st.err
-	}
-	return nil
+	return s.st.firstErr()
 }
 
 // Target is somewhere an image can be written to. Operations whose names end in
@@ -136,9 +136,9 @@ func (s *Source) Err() error {
 type Target struct {
 	handle
 	memory bool
-	// streamID is non-zero when the bytes go to an io.Writer, and names the
-	// registry entry holding it.
-	streamID uint64
+	// st is non-nil when the bytes go to an io.Writer. On the handle rather
+	// than only in the registry so Err keeps working after Close.
+	st *stream
 }
 
 // NewTargetToFile creates a target writing to a file.
@@ -192,22 +192,19 @@ func (t *Target) Bytes() ([]byte, error) {
 // Close releases the target, and the writer behind it when there is one.
 func (t *Target) Close() {
 	t.close()
-	if t.streamID != 0 {
-		unregisterStream(t.streamID)
+	if t.st != nil {
+		unregisterStream(t.st.id)
 	}
 }
 
 // Err reports the first error the underlying writer returned, if any. A save
 // through a failing writer fails as a libvips error, which reports that writing
-// failed but not why; this says why.
+// failed but not why; this says why. It keeps answering after Close.
 func (t *Target) Err() error {
-	if t.streamID == 0 {
+	if t.st == nil {
 		return nil
 	}
-	if st := lookupStream(t.streamID); st != nil {
-		return st.err
-	}
-	return nil
+	return t.st.firstErr()
 }
 
 // SetCacheMax bounds how many built operations libvips keeps for reuse. Zero

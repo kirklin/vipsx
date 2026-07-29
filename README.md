@@ -186,10 +186,15 @@ take its sequential path and buffer what it needs instead. Both work; the
 seekable one works for more formats, since a few loaders cannot operate without
 seeking.
 
-`Close` is not optional here. Until it is called the stream stays registered so
-libvips can call back into it, which pins the reader or writer.
-`vips.OpenStreams()` reports how many are outstanding and should return to
-zero; the soak suite asserts exactly that.
+`Close` releases the reader or writer on the spot, so it comes after the save:
+evaluate every image loaded from the source first, then close. Demanding bytes
+after Close fails the operation cleanly — a file-backed source is more
+forgiving there, since libvips holds the file itself. Skipping Close pins the
+reader until the collector gets to the handle; `vips.OpenStreams()` reports how
+many are outstanding, returns to zero when everything is closed, and the soak
+suite asserts exactly that. `Err` reports what the reader or writer actually
+said when a call failed — libvips' own error says only that reading or writing
+failed — and it keeps answering after Close.
 
 ### Runtime controls
 
