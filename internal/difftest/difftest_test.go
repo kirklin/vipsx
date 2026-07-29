@@ -1,94 +1,280 @@
-// Package difftest checks this binding against the vips command line.
-//
-// The binding reaches every operation through one generic path, so there is no
-// per-operation code to review. What replaces that review is this: run each
-// operation both through the binding and through libvips' own CLI, and require
-// the pixels to match exactly. The CLI is an independent implementation of the
-// same call sequence, which makes it a real oracle rather than a restatement of
-// the binding's own assumptions.
 package difftest
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/kirklin/vipsx/vips"
 )
 
-// fixture builds a small three-band image the CLI and the binding both read.
+// buildFixtures makes the images a comparison runs on: a seeded noise image
+// fanned out to three bands, and a second one so array-of-image arguments have
+// something to work with.
 //
 // The noise is seeded. An oracle whose input changes every run cannot tell a
 // real regression from an unlucky draw, and a difference that appears once and
 // not again is worse than no signal at all.
-func fixture(t *testing.T, dir string) string {
+func buildFixtures(t *testing.T, dir string) []string {
 	t.Helper()
+	run := func(args ...string) {
+		if out, err := exec.Command("vips", args...).CombinedOutput(); err != nil {
+			t.Fatalf("building fixtures: vips %v: %v\n%s", args, err, out)
+		}
+	}
 	gray := filepath.Join(dir, "gray.png")
-	cmd := exec.Command("vips", "gaussnoise", gray, "64", "48", "--seed", "42")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("building fixture: %v\n%s", err, out)
-	}
-	// gaussnoise is one band; fan it out to three so band-aware operations get
-	// something representative.
 	rgb := filepath.Join(dir, "rgb.png")
-	cmd = exec.Command("vips", "bandjoin_const", gray, rgb, "128 200")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("building rgb fixture: %v\n%s", err, out)
-	}
-	return rgb
+	second := filepath.Join(dir, "rgb2.png")
+
+	run("gaussnoise", gray, "64", "48", "--seed", "42")
+	run("bandjoin_const", gray, rgb, "100 180")
+	run("gaussnoise", filepath.Join(dir, "gray2.png"), "64", "48", "--seed", "99")
+	run("bandjoin_const", filepath.Join(dir, "gray2.png"), second, "60 220")
+
+	return []string{rgb, second}
 }
 
-// candidate is an operation the CLI can drive with two positional arguments:
-// one required image in, one required image out, nothing else required.
-type candidate struct {
-	op     string
-	inArg  string
-	outArg string // not always "out"; labelregions calls it "mask"
-}
-
-func candidates(t *testing.T) []candidate {
+// fixtures returns the image sets to drive the comparison with. The seeded
+// synthetic pair is always included so the suite is self-contained; setting
+// VIPSX_IMAGE_DIR adds real photographs, which exercise larger sizes, real
+// colour profiles and EXIF that synthetic noise never produces.
+func fixtures(t *testing.T, dir string) map[string][]string {
 	t.Helper()
-	var ops []candidate
-	for _, name := range vips.Operations() {
-		spec, err := vips.Describe(name)
-		if err != nil {
+	synthetic := buildFixtures(t, dir)
+	out := map[string][]string{"synthetic": synthetic}
+
+	extra := os.Getenv("VIPSX_IMAGE_DIR")
+	if extra == "" {
+		return out
+	}
+	entries, err := os.ReadDir(extra)
+	if err != nil {
+		t.Fatalf("VIPSX_IMAGE_DIR: %v", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() {
 			continue
 		}
-		var c candidate
-		var inImages, outImages, otherRequired int
-		for _, a := range spec.Args {
-			if a.Deprecated || !a.Required {
+		switch strings.ToLower(filepath.Ext(e.Name())) {
+		case ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff":
+			// Scaled down first. This compares two implementations against each
+			// other; running it on full-resolution photographs measures
+			// throughput instead, and turns a half-minute suite into a
+			// quarter-hour one without checking anything extra.
+			small := filepath.Join(dir, "fixture-"+sanitise(e.Name())+".png")
+			cmd := exec.Command("vips", "thumbnail",
+				filepath.Join(extra, e.Name()), small, "96")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Logf("skipping %s: %s", e.Name(), firstLine(out))
 				continue
 			}
-			switch {
-			case a.Input && a.Kind == vips.KindImage:
-				inImages++
-				c.inArg = a.Name
-			case a.Output && a.Kind == vips.KindImage:
-				outImages++
-				c.outArg = a.Name
-			default:
-				otherRequired++
-			}
-		}
-		if inImages == 1 && outImages == 1 && otherRequired == 0 {
-			c.op = name
-			ops = append(ops, c)
+			// Paired with a synthetic second image so array arguments still work.
+			out[e.Name()] = []string{small, synthetic[1]}
 		}
 	}
-	return ops
+	return out
+}
+
+// plan is one operation's comparison, with both sides derived from the same
+// argument values.
+type plan struct {
+	op       string
+	cliArgs  []string    // positional arguments for `vips <op> ...`
+	callArgs []vips.Arg  // the same values, for the binding
+	outName  string      // the required image output to compare
+	outPath  string      // where the CLI was told to write it
+	kinds    []vips.Kind // the marshalling paths this comparison exercises
+	// savesToFile marks operations that write a file instead of returning an
+	// image; for those the thing compared is what landed on disk.
+	savesToFile bool
+	skipWhy     string // non-empty when this operation cannot be driven
+}
+
+// saverExtension guesses the file suffix a save operation expects, from its own
+// name. A wrong guess makes the save fail on both paths, which is a skip rather
+// than an accusation.
+func saverExtension(op string) string {
+	base := strings.TrimSuffix(op, "save")
+	switch base {
+	case "jpeg":
+		return ".jpg"
+	case "tiff":
+		return ".tif"
+	case "heif":
+		return ".heic"
+	case "jp2k":
+		return ".jp2"
+	case "nifti":
+		return ".nii"
+	case "rad":
+		return ".hdr"
+	case "matrix":
+		return ".mat"
+	case "vips":
+		return ".v"
+	}
+	return "." + base
+}
+
+// planForSaver handles operations that write a file rather than returning an
+// image. The comparison is the same shape, but the thing compared is what
+// landed on disk.
+//
+// This matters out of proportion to the operation count: the save operations
+// are where the keep flags live, and where most of the format options live, so
+// leaving them out means never checking those marshalling paths at all.
+func planForSaver(op string, spec *vips.OpSpec, set *imageSet, dir string) (plan, bool) {
+	filename, ok := spec.Arg("filename")
+	if !ok || filename.Kind != vips.KindString || !filename.Required {
+		return plan{}, false
+	}
+	for _, a := range spec.Args {
+		if !a.Deprecated && a.Required && a.Output {
+			return plan{}, false // it returns something, so it is not a plain saver
+		}
+	}
+
+	out := filepath.Join(dir, op+".cli"+saverExtension(op))
+	p := plan{op: op, outPath: out, savesToFile: true}
+
+	for _, a := range spec.Args {
+		if a.Deprecated || !a.Required || !a.Input {
+			continue
+		}
+		if a.Name == "filename" {
+			p.cliArgs = append(p.cliArgs, out)
+			p.callArgs = append(p.callArgs, vips.In("filename", out))
+			p.kinds = append(p.kinds, a.Kind)
+			continue
+		}
+		v, ok := valueFor(a, set, "")
+		if !ok {
+			return plan{}, false
+		}
+		p.cliArgs = append(p.cliArgs, v.cli)
+		p.callArgs = append(p.callArgs, v.arg)
+		p.kinds = append(p.kinds, a.Kind)
+	}
+	return p, true
+}
+
+// planFor works out how to invoke an operation both ways.
+//
+// The command line takes an operation's required arguments positionally, in the
+// order libvips declares them, with image outputs given as filenames. Building
+// both sides from one walk of that declaration keeps them in step.
+func planFor(op string, set *imageSet, dir string) plan {
+	p := plan{op: op}
+
+	spec, err := vips.Describe(op)
+	if err != nil {
+		p.skipWhy = "cannot describe"
+		return p
+	}
+
+	if saver, ok := planForSaver(op, spec, set, dir); ok {
+		return saver
+	}
+
+	imageOutputs := 0
+	for _, a := range spec.Args {
+		if a.Deprecated || !a.Required {
+			continue
+		}
+
+		outPath := ""
+		if a.Output && a.Kind == vips.KindImage {
+			imageOutputs++
+			outPath = filepath.Join(dir, fmt.Sprintf("%s.cli.%d.png", op, imageOutputs))
+			if p.outName == "" {
+				p.outName, p.outPath = a.Name, outPath
+			}
+		} else if a.Output {
+			// A required non-image output, such as the number of regions
+			// labelregions reports. The CLI prints it rather than writing a
+			// file, so it takes no argument position.
+			continue
+		}
+
+		v, ok := valueFor(a, set, outPath)
+		if !ok {
+			p.skipWhy = fmt.Sprintf("argument %q is a %s, which the CLI cannot be handed",
+				a.Name, a.Kind)
+			return p
+		}
+		p.cliArgs = append(p.cliArgs, v.cli)
+		if a.Input {
+			p.callArgs = append(p.callArgs, v.arg)
+			p.kinds = append(p.kinds, a.Kind)
+		}
+	}
+
+	if imageOutputs == 0 {
+		p.skipWhy = "produces no image to compare"
+	}
+	return p
+}
+
+// withOptionals adds every optional argument the command line can express.
+//
+// Most booleans and flags in libvips are optional, so a comparison that sends
+// only required arguments never exercises those marshalling paths at all. This
+// pass does, at the cost of a lower acceptance rate: an operation that dislikes
+// one of the values rejects the whole call, on both sides equally, and the
+// comparison is skipped rather than counted against the binding.
+func withOptionals(p plan, set *imageSet, dir string) plan {
+	if p.skipWhy != "" {
+		return p
+	}
+	spec, err := vips.Describe(p.op)
+	if err != nil {
+		p.skipWhy = "cannot describe"
+		return p
+	}
+
+	q := p
+	q.cliArgs = append([]string{}, p.cliArgs...)
+	q.callArgs = append([]vips.Arg{}, p.callArgs...)
+	q.kinds = append([]vips.Kind{}, p.kinds...)
+	if p.savesToFile {
+		q.outPath = filepath.Join(dir, p.op+".cli.opt"+saverExtension(p.op))
+	} else {
+		q.outPath = filepath.Join(dir, p.op+".cli.opt.png")
+	}
+	q.cliArgs = replaceOut(q.cliArgs, p.outPath, q.outPath)
+	for i, a := range q.callArgs {
+		if a.Name() == "filename" {
+			q.callArgs[i] = vips.In("filename", q.outPath)
+		}
+	}
+
+	added := 0
+	for _, a := range spec.Args {
+		if a.Deprecated || a.Required || !a.Input {
+			continue
+		}
+		flags, arg, ok := optionalValueFor(a, set)
+		if !ok {
+			continue
+		}
+		q.cliArgs = append(q.cliArgs, flags...)
+		q.callArgs = append(q.callArgs, arg)
+		q.kinds = append(q.kinds, a.Kind)
+		added++
+	}
+	if added == 0 {
+		q.skipWhy = "no optional arguments the CLI can express"
+	}
+	return q
 }
 
 // maxAbsDiff reports the largest absolute per-pixel difference between two
 // images. Zero means the two paths produced identical pixels.
-//
-// Both sides are written in libvips' own .v format rather than PNG. Several
-// operations return doubles — stats returns a matrix of sums and deviations
-// running into the billions — and casting those to 8-bit for comparison
-// measures the cast rather than the operation.
 func maxAbsDiff(a, b string) (float64, error) {
 	ia, err := vips.LoadFile(a)
 	if err != nil {
@@ -107,32 +293,57 @@ func maxAbsDiff(a, b string) (float64, error) {
 			ib.Width(), ib.Height(), ib.Bands())
 	}
 
-	sub, err := vips.Call("subtract", vips.In("left", ia), vips.In("right", ib))
+	sub, err := vips.Subtract(ia, ib)
 	if err != nil {
 		return 0, err
 	}
 	defer sub.Close()
-	diff, err := sub.Image("out")
-	if err != nil {
-		return 0, err
-	}
 
-	abs, err := vips.Call("abs", vips.In("in", diff))
+	abs, err := vips.Abs(sub)
 	if err != nil {
 		return 0, err
 	}
 	defer abs.Close()
-	absImage, err := abs.Image("out")
-	if err != nil {
-		return 0, err
+
+	return vips.Max(abs, nil)
+}
+
+// compareSaved compares what two save calls wrote.
+//
+// Bytes first, which is the strictest thing available and works for formats
+// nothing can read back: raw pixel dumps, and whatever magicksave decided to
+// produce. Falling back to pixels covers formats that embed something variable
+// in a header. Some savers write a directory rather than a file, and those are
+// reported as unverifiable rather than quietly passed.
+func compareSaved(cliPath, goPath string) (diff float64, why string, err error) {
+	for _, p := range []string{cliPath, goPath} {
+		info, statErr := os.Stat(p)
+		if statErr != nil {
+			return 0, "the saver wrote nothing at the path it was given", nil
+		}
+		if info.IsDir() {
+			return 0, "this saver writes a directory, which this harness cannot compare", nil
+		}
 	}
 
-	stats, err := vips.Call("max", vips.In("in", absImage))
+	a, err := os.ReadFile(cliPath)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
-	defer stats.Close()
-	return stats.Float("out")
+	b, err := os.ReadFile(goPath)
+	if err != nil {
+		return 0, "", err
+	}
+	if bytes.Equal(a, b) {
+		return 0, "", nil
+	}
+
+	// Not byte-identical: fall back to the pixels, if the format can be read.
+	diff, err = maxAbsDiff(cliPath, goPath)
+	if err != nil {
+		return 0, fmt.Sprintf("bytes differ and the format cannot be read back (%v)", err), nil
+	}
+	return diff, "", nil
 }
 
 // oracleIsStable reports whether the CLI agrees with itself on an operation.
@@ -147,21 +358,23 @@ func maxAbsDiff(a, b string) (float64, error) {
 // So a mismatch is only evidence against the binding once the oracle has been
 // shown to be repeatable. This asks it directly rather than granting a blanket
 // epsilon, which would also swallow real breakage.
-func oracleIsStable(t *testing.T, op, src, first, dir string) (bool, float64) {
+func oracleIsStable(t *testing.T, p plan, dir string) (bool, float64) {
 	t.Helper()
-	// Several re-runs, not one. An operation that agrees with itself only some
-	// of the time will pass a single re-run often enough to make the suite
-	// flaky, which is the failure mode this whole check exists to remove.
 	const reruns = 3
 	worst := 0.0
 	for i := range reruns {
-		again := filepath.Join(dir, fmt.Sprintf("%s.cli%d.v", op, i+2))
-		cmd := exec.Command("vips", op, src, again)
-		cmd.Env = append(os.Environ(), "VIPS_CONCURRENCY=1")
-		if out, err := cmd.CombinedOutput(); err != nil {
+		again := filepath.Join(dir, fmt.Sprintf("%s.recheck%d.png", p.op, i))
+		args := append([]string{p.op}, replaceOut(p.cliArgs, p.outPath, again)...)
+		if out, err := exec.Command("vips", args...).CombinedOutput(); err != nil {
 			t.Fatalf("re-running the CLI: %v\n%s", err, out)
 		}
-		d, err := maxAbsDiff(first, again)
+		var d float64
+		var err error
+		if p.savesToFile {
+			d, _, err = compareSaved(p.outPath, again)
+		} else {
+			d, err = maxAbsDiff(p.outPath, again)
+		}
 		if err != nil {
 			t.Fatalf("comparing two CLI runs: %v", err)
 		}
@@ -170,29 +383,13 @@ func oracleIsStable(t *testing.T, op, src, first, dir string) (bool, float64) {
 	return worst == 0, worst
 }
 
-// fixtures returns the images to drive the comparison with. The seeded
-// synthetic image is always included so the suite is self-contained; setting
-// VIPSX_IMAGE_DIR adds real photographs, which exercise larger sizes, real
-// colour profiles and EXIF that synthetic noise never produces.
-func fixtures(t *testing.T, dir string) map[string]string {
-	t.Helper()
-	out := map[string]string{"synthetic": fixture(t, dir)}
-
-	extra := os.Getenv("VIPSX_IMAGE_DIR")
-	if extra == "" {
-		return out
-	}
-	entries, err := os.ReadDir(extra)
-	if err != nil {
-		t.Fatalf("VIPSX_IMAGE_DIR: %v", err)
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		switch strings.ToLower(filepath.Ext(e.Name())) {
-		case ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff":
-			out[e.Name()] = filepath.Join(extra, e.Name())
+func replaceOut(args []string, from, to string) []string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		if a == from {
+			out[i] = to
+		} else {
+			out[i] = a
 		}
 	}
 	return out
@@ -204,13 +401,12 @@ func TestAgainstCLI(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	ops := candidates(t)
-	if len(ops) < 20 {
-		t.Fatalf("only %d comparable operations found, expected many more", len(ops))
-	}
+	ops := vips.Operations()
 
-	for name, src := range fixtures(t, dir) {
-		t.Run(name, func(t *testing.T) { compareAll(t, dir+"/"+sanitise(name), src, ops) })
+	for name, paths := range fixtures(t, dir) {
+		t.Run(name, func(t *testing.T) {
+			compareAll(t, filepath.Join(dir, sanitise(name)), paths, ops)
+		})
 	}
 }
 
@@ -218,90 +414,161 @@ func sanitise(name string) string {
 	return strings.NewReplacer("/", "_", " ", "_", ".", "_").Replace(name)
 }
 
-func compareAll(t *testing.T, prefix, src string, ops []candidate) {
+func compareAll(t *testing.T, dir string, paths []string, ops []string) {
 	t.Helper()
-	if err := os.MkdirAll(prefix, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	var compared, skipped, mismatched, unstable int
-	for _, c := range ops {
-		t.Run(c.op, func(t *testing.T) {
-			dir := prefix
-			viaCLI := filepath.Join(dir, c.op+".cli.v")
-			viaGo := filepath.Join(dir, c.op+".go.v")
+	set := &imageSet{paths: paths}
+	for _, p := range paths {
+		im, err := vips.LoadFile(p)
+		if err != nil {
+			t.Fatalf("loading fixture %s: %v", p, err)
+		}
+		defer im.Close()
+		set.images = append(set.images, im)
+	}
 
-			cmd := exec.Command("vips", c.op, src, viaCLI)
-			cmd.Env = append(os.Environ(), "VIPS_CONCURRENCY=1")
-			cliOut, cliErr := cmd.CombinedOutput()
+	var compared, undrivable, rejected, unstable, mismatched, unverifiable int
+	var err error
+	var undrivableWhy = map[string]int{}
+	// Which marshalling paths the oracle actually exercised. Counting operations
+	// flatters the result: what matters is whether every way of turning a Go
+	// value into a libvips argument has been checked against something
+	// independent, and an operation count says nothing about that.
+	var kindsSeen = map[vips.Kind]int{}
 
-			in, err := vips.LoadFile(src)
-			if err != nil {
-				t.Fatalf("loading fixture: %v", err)
+	compare := func(t *testing.T, p plan, suffix string) {
+		t.Helper()
+		if p.skipWhy != "" {
+			undrivable++
+			undrivableWhy[p.skipWhy]++
+			t.Skip(p.skipWhy)
+		}
+		op := p.op
+		viaGo := filepath.Join(dir, op+suffix+".go.png")
+		if p.savesToFile {
+			viaGo = filepath.Join(dir, op+suffix+".go"+saverExtension(op))
+		}
+
+		cliOut, cliErr := exec.Command("vips",
+			append([]string{op}, p.cliArgs...)...).CombinedOutput()
+
+		callArgs := p.callArgs
+		if p.savesToFile {
+			callArgs = make([]vips.Arg, len(p.callArgs))
+			copy(callArgs, p.callArgs)
+			for i, a := range callArgs {
+				if a.Name() == "filename" {
+					callArgs[i] = vips.In("filename", viaGo)
+				}
 			}
-			defer in.Close()
+		}
 
-			outs, goErr := vips.Call(c.op, vips.In(c.inArg, in))
-			if goErr == nil {
-				defer outs.Close()
-				if im, err := outs.Image(c.outArg); err == nil {
-					saved, err := vips.Call("vipssave", vips.In("in", im), vips.In("filename", viaGo))
-					if err != nil {
-						goErr = err
-					} else {
-						saved.Close()
-					}
+		outs, goErr := vips.Call(op, callArgs...)
+		if goErr == nil {
+			defer outs.Close()
+			if !p.savesToFile {
+				if im, err := outs.Image(p.outName); err == nil {
+					goErr = vips.Pngsave(im, viaGo, nil)
 				} else {
 					goErr = err
 				}
 			}
+		}
 
-			// Operations that reject this input on both sides tell us nothing.
-			if cliErr != nil && goErr != nil {
-				skipped++
-				t.Skipf("rejected by both paths")
-			}
-			if cliErr != nil {
-				t.Fatalf("CLI failed but the binding succeeded\nCLI: %v\n%s", cliErr, cliOut)
-			}
-			if goErr != nil {
-				t.Fatalf("binding failed but the CLI succeeded: %v", goErr)
-			}
+		// Operations that reject these values on both sides tell us nothing.
+		if cliErr != nil && goErr != nil {
+			rejected++
+			t.Skipf("rejected by both paths")
+		}
+		if cliErr != nil {
+			t.Fatalf("CLI failed but the binding succeeded\nvips %s\n%v\n%s",
+				strings.Join(append([]string{op}, p.cliArgs...), " "), cliErr, cliOut)
+		}
+		if goErr != nil {
+			t.Fatalf("binding failed but the CLI succeeded: %v", goErr)
+		}
 
-			diff, err := maxAbsDiff(viaCLI, viaGo)
+		var diff float64
+		if p.savesToFile {
+			var why string
+			diff, why, err = compareSaved(p.outPath, viaGo)
+			if err != nil {
+				t.Fatalf("comparing what was written: %v", err)
+			}
+			if why != "" {
+				unverifiable++
+				t.Skip(why)
+			}
+		} else {
+			diff, err = maxAbsDiff(p.outPath, viaGo)
 			if err != nil {
 				t.Fatalf("comparing results: %v", err)
 			}
-			compared++
-			if diff == 0 {
-				return
-			}
-			if stable, selfDiff := oracleIsStable(t, c.op, src, viaCLI, dir); !stable {
-				unstable++
-				t.Skipf("libvips is not reproducible here: two CLI runs differ by %v, "+
-					"binding differs from the first by %v", selfDiff, diff)
-			}
-			mismatched++
-			t.Errorf("pixels differ from a reproducible CLI result, "+
-				"max absolute difference %v", diff)
+		}
+		compared++
+		for _, k := range p.kinds {
+			kindsSeen[k]++
+		}
+		if diff == 0 {
+			return
+		}
+		if stable, selfDiff := oracleIsStable(t, p, dir); !stable {
+			unstable++
+			t.Skipf("libvips is not reproducible here: CLI runs differ by %v, "+
+				"binding differs from the first by %v", selfDiff, diff)
+		}
+		mismatched++
+		t.Errorf("pixels differ from a reproducible CLI result, "+
+			"max absolute difference %v", diff)
+	}
+
+	for _, op := range ops {
+		required := planFor(op, set, dir)
+		t.Run(op, func(t *testing.T) { compare(t, required, "") })
+		// A second pass carrying every optional argument the CLI can express,
+		// which is the only way the boolean and flags marshalling ever gets
+		// looked at: almost none of those are required arguments.
+		t.Run(op+"+options", func(t *testing.T) {
+			compare(t, withOptionals(required, set, dir), ".opt")
 		})
 	}
 
-	t.Logf("compared %d operations against the CLI, %d rejected by both, "+
-		"%d skipped as not reproducible in libvips, %d mismatched",
-		compared, skipped, unstable, mismatched)
-}
+	t.Logf("%d compared against the CLI, %d rejected these values, "+
+		"%d not drivable from the CLI, %d wrote something unreadable, "+
+		"%d skipped as not reproducible, %d mismatched",
+		compared, rejected, undrivable, unverifiable, unstable, mismatched)
 
-func TestMain(m *testing.M) {
-	// Both sides run on one thread.
-	//
-	// Several reductions choose between equally correct answers by whichever
-	// worker got there first. stats is the clearest: over one of the sample
-	// photographs it reports the maximum at (753,448) or at (803,309) from run
-	// to run, both being pixels that hold the maximum, while every statistic in
-	// the same matrix — sum, mean, deviation — is bit-identical. Pinning the
-	// thread count makes the tie break the same way on both sides, so the
-	// comparison measures the binding instead of the scheduler.
-	vips.SetConcurrency(1)
-	os.Exit(m.Run())
+	// Sources, targets and buffers cannot be handed to the command line at all,
+	// so they are verified by TestStreamsAgainstCLI instead, which pairs each
+	// stream operation with its file-based sibling. Counting them as unverified
+	// here would misreport what the suite covers.
+	elsewhere := map[vips.Kind]bool{
+		vips.KindSource: true, vips.KindTarget: true, vips.KindBlob: true,
+	}
+	var missing []string
+	for k := vips.KindBool; k <= vips.KindObject; k++ {
+		if kindsSeen[k] == 0 && !elsewhere[k] {
+			missing = append(missing, k.String())
+		}
+	}
+	t.Logf("argument kinds verified here: %d of 17 (source, target and blob are "+
+		"covered by TestStreamsAgainstCLI)", 17-len(missing)-len(elsewhere))
+	if len(missing) > 0 {
+		t.Logf("  still never verified against anything independent: %s",
+			strings.Join(missing, " "))
+	}
+
+	reasons := make([]string, 0, len(undrivableWhy))
+	for why := range undrivableWhy {
+		reasons = append(reasons, why)
+	}
+	sort.Slice(reasons, func(i, j int) bool {
+		return undrivableWhy[reasons[i]] > undrivableWhy[reasons[j]]
+	})
+	for _, why := range reasons[:min(len(reasons), 6)] {
+		t.Logf("  not drivable, %3d ops: %s", undrivableWhy[why], why)
+	}
 }
