@@ -1,7 +1,7 @@
 # libvips headers use -Xpreprocessor, which cgo refuses to pass on unless told.
 export CGO_CFLAGS_ALLOW = -Xpreprocessor
 
-.PHONY: all check test race cover diff soak bigdata asan cleak generate site check-module-size fmt vet ci
+.PHONY: all check test race cover diff soak bigdata asan cleak docker-cleak generate site check-module-size fmt vet ci
 
 all: check fmt vet test
 
@@ -47,10 +47,15 @@ bigdata:
 # losing two thousand allocations and watching the run report nothing. This
 # builds the same C sources into a plain program instead, where the checker
 # works. --leak first, to prove the checker is on before believing it.
+# Which compiler builds the sanitised program. clang by default, since that is
+# what macOS has; Debian ships the AddressSanitizer runtime with gcc instead, so
+# the container overrides this rather than installing a second toolchain.
+CLEAK_CC ?= clang
 CLEAK_CFLAGS = -g -O1 -fsanitize=address -fno-omit-frame-pointer -Ivips
 cleak:
-	@which clang >/dev/null || (echo "clang is needed for -fsanitize=address" && exit 1)
-	clang $(CLEAK_CFLAGS) $$(pkg-config --cflags vips) \
+	@which $(CLEAK_CC) >/dev/null || \
+		(echo "$(CLEAK_CC) is needed for -fsanitize=address" && exit 1)
+	$(CLEAK_CC) $(CLEAK_CFLAGS) $$(pkg-config --cflags vips) \
 		vips/*.c internal/cleak/main.c \
 		$$(pkg-config --libs vips) -o /tmp/vipsx-cleak
 	@echo "--- can this machine detect leaks at all? ---"
@@ -72,6 +77,11 @@ cleak:
 		LSAN_OPTIONS=suppressions=$(PWD)/.github/lsan.supp:exitcode=23 \
 			/tmp/vipsx-cleak; \
 	fi
+
+# The leak check on Linux, in a container, which is the only place it runs.
+docker-cleak:
+	docker build -f internal/cleak/Dockerfile -t vipsx-cleak .
+	docker run --rm vipsx-cleak
 
 # Linux only: the Go toolchain has no -asan on darwin/arm64.
 asan:

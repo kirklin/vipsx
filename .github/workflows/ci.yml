@@ -225,6 +225,9 @@ jobs:
       # own allocations are covered by internal/soak instead.
       - name: AddressSanitizer over the C core
         if: matrix.san == 'cleak'
-        env:
-          CC: clang
-        run: make cleak
+        # gcc, not clang. Leak checking is silently inert under the runner's
+        # clang — a program containing nothing but a leak reports nothing and
+        # exits zero — while the same check under gcc works in a Debian
+        # container. The target says which of the two it managed either way, so
+        # this cannot quietly become a check of nothing.
+        run: make cleak CLEAK_CC=gcc
