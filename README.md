@@ -218,25 +218,40 @@ without touching the call path.
 ## Correctness
 
 There is no per-operation code to review, so review is replaced by an oracle.
-`internal/difftest` runs every operation that takes one image and returns one
-image through both this binding and the `vips` command line, and requires the
-pixels to match exactly.
+`internal/difftest` invokes each operation twice — once through this binding,
+once through the `vips` command line — and requires the pixels to match exactly.
+Both sides are built from one set of argument values, so the two cannot drift
+into testing different things.
 
 ```bash
-go test ./internal/difftest/
-VIPSX_IMAGE_DIR=/path/to/photos go test ./internal/difftest/   # add real images
+go test ./internal/difftest/                                   # about 45s
+VIPSX_IMAGE_DIR=/path/to/photos go test ./internal/difftest/   # adds real images
 ```
 
-Both sides run pinned to one worker thread, and both write libvips' own `.v`
-format rather than PNG. Neither is incidental. Several operations reduce over the
-whole image and break ties by whichever thread arrived first: over one of the
-sample photographs `stats` reports the maximum at (753,448) or at (803,309)
-between runs, both being pixels that hold the maximum, while every statistic in
-the same matrix — sum, mean, deviation — is bit-identical. And `stats` returns
-doubles running into the billions, so comparing after a cast to 8-bit PNG
-measures the cast instead of the operation. If an operation still disagrees, the
-harness re-runs the CLI to ask whether libvips is reproducible there at all, and
-reports the two cases separately.
+On libvips 8.18 that is 221 comparisons across two passes: one sending only
+required arguments, and one adding every optional argument the command line can
+express. The second pass is the only reason the boolean and flags paths are
+exercised at all, since almost none of those are required arguments. Save
+operations are compared by the bytes they wrote rather than by an image they
+returned.
+
+Counting operations flatters this, so the suite reports the number that matters
+instead: how many of the eighteen ways a Go value can become a libvips argument
+have been checked against something this package did not write. Sources, targets
+and buffers cannot be handed to a command line at all, so `TestStreamsAgainstCLI`
+pairs each stream operation with its file-based sibling — the CLI reads the file,
+the binding reads the same bytes through a source or a buffer, and the results
+must agree. That leaves four marginal kinds unverified: `uint64`, `refstring`,
+`[]int`, and the generic object fallback, together about twenty argument slots in
+all of libvips.
+
+Two operations are excluded automatically rather than by name. `stats` and the
+Fourier transforms reduce over the whole image with one accumulator per worker
+thread, so the low bits of the result depend on how work landed on threads. The
+harness detects this by re-running the CLI three times: if libvips disagrees with
+itself, the comparison is skipped and reported as such. Measured on this machine,
+`stats` over the same file gives the CLI eight different answers in ten runs,
+while this binding gives ten identical ones.
 
 `TestNoUnknownArgumentKinds` walks every argument of every operation and fails if
 any falls outside the eighteen types the marshaller knows. A libvips upgrade that
