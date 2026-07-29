@@ -29,6 +29,18 @@ That typed layer is generated from the installed libvips, and every function in
 it is a few lines over one generic `Call`. Both are public: use the typed one by
 default, drop to `Call` for an operation the generator has not been run against.
 
+## Version
+
+`vips.PackageVersion` carries the release this source is, and
+`vips.ModuleVersion()` reports what the calling program actually resolved from
+the module graph — the honest answer when a consumer is pinned to something
+older. `vips.Version()` is a different question: it reports the libvips this is
+linked against.
+
+The constant and the git tag are checked against each other by CI on every
+tagged build, because a version file that can quietly disagree with the tag is
+worse than not having one.
+
 ## Install
 
 Needs libvips 8.14 or newer, and a C toolchain.
