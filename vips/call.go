@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -196,10 +197,26 @@ func marshal(ar *arena, spec ArgSpec, v any, dst *C.VipsxArg, keep *[]any) error
 			dst.i = 1
 		}
 
-	case KindInt, KindUint64, KindEnum, KindFlags:
+	case KindInt, KindUint64, KindFlags:
 		n, ok := asInt(v)
 		if !ok {
 			return typeErr(spec, v, "integer")
+		}
+		dst.i = C.gint64(n)
+
+	case KindEnum:
+		n, ok := asInt(v)
+		if !ok {
+			return typeErr(spec, v, "integer")
+		}
+		// Checked against the type's members before it is sent. libvips does
+		// not validate these: an out-of-range value is accepted, stored, and
+		// then trips a g_assert deep inside a later operation, which aborts the
+		// whole process rather than returning an error. Nothing a caller passes
+		// should be able to do that.
+		if !isEnumMember(spec.TypeName, int(n)) {
+			return fmt.Errorf("argument %q: %d is not a member of %s, valid values are %s",
+				spec.Name, n, spec.TypeName, enumMembers(spec.TypeName))
 		}
 		dst.i = C.gint64(n)
 
@@ -317,6 +334,50 @@ func unmarshal(out *C.VipsxOut) (any, error) {
 		return nil, fmt.Errorf("output %q has an unsupported type",
 			C.GoString(out.name))
 	}
+}
+
+var (
+	enumMu    sync.RWMutex
+	enumCache = map[string]map[int]string{}
+)
+
+// enumValuesFor caches the members of an enum type, since marshalling consults
+// them on every call.
+func enumValuesFor(typeName string) map[int]string {
+	enumMu.RLock()
+	members, ok := enumCache[typeName]
+	enumMu.RUnlock()
+	if ok {
+		return members
+	}
+
+	members = map[int]string{}
+	for _, v := range EnumValues(typeName) {
+		members[v.Value] = v.Nick
+	}
+	enumMu.Lock()
+	enumCache[typeName] = members
+	enumMu.Unlock()
+	return members
+}
+
+func isEnumMember(typeName string, value int) bool {
+	members := enumValuesFor(typeName)
+	if len(members) == 0 {
+		return true // nothing known about this type; let libvips decide
+	}
+	_, ok := members[value]
+	return ok
+}
+
+func enumMembers(typeName string) string {
+	members := enumValuesFor(typeName)
+	pairs := make([]string, 0, len(members))
+	for value, nick := range members {
+		pairs = append(pairs, fmt.Sprintf("%d (%s)", value, nick))
+	}
+	sort.Strings(pairs)
+	return strings.Join(pairs, ", ")
 }
 
 func typeErr(spec ArgSpec, got any, want string) error {

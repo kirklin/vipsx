@@ -13,6 +13,21 @@ import (
 	"github.com/kirklin/vipsx/vips"
 )
 
+// runCLI invokes the vips command line for a comparison.
+//
+// Pinned to one worker thread, and the binding is pinned to match. Several
+// libvips operations reduce over the whole image with one accumulator per
+// thread and combine them in completion order, so with threads free the last
+// bit of the answer depends on scheduling: phasecor, invfft and stats all drift
+// by one. Two implementations cannot be compared for exactness while the
+// implementation is allowed to disagree with itself, so the comparison removes
+// the freedom rather than tolerating the result.
+func runCLI(args ...string) ([]byte, error) {
+	cmd := exec.Command("vips", args...)
+	cmd.Env = append(os.Environ(), "VIPS_CONCURRENCY=1")
+	return cmd.CombinedOutput()
+}
+
 // buildFixtures makes the images a comparison runs on: a seeded noise image
 // fanned out to three bands, and a second one so array-of-image arguments have
 // something to work with.
@@ -23,7 +38,7 @@ import (
 func buildFixtures(t *testing.T, dir string) []string {
 	t.Helper()
 	run := func(args ...string) {
-		if out, err := exec.Command("vips", args...).CombinedOutput(); err != nil {
+		if out, err := runCLI(args...); err != nil {
 			t.Fatalf("building fixtures: vips %v: %v\n%s", args, err, out)
 		}
 	}
@@ -67,10 +82,9 @@ func fixtures(t *testing.T, dir string) map[string][]string {
 			// throughput instead, and turns a half-minute suite into a
 			// quarter-hour one without checking anything extra.
 			small := filepath.Join(dir, "fixture-"+sanitise(e.Name())+".png")
-			cmd := exec.Command("vips", "thumbnail",
-				filepath.Join(extra, e.Name()), small, "96")
-			if out, err := cmd.CombinedOutput(); err != nil {
-				t.Logf("skipping %s: %s", e.Name(), firstLine(out))
+			cliOut, err := runCLI("thumbnail", filepath.Join(extra, e.Name()), small, "96")
+			if err != nil {
+				t.Logf("skipping %s: %s", e.Name(), firstLine(cliOut))
 				continue
 			}
 			// Paired with a synthetic second image so array arguments still work.
@@ -346,6 +360,27 @@ func compareSaved(cliPath, goPath string) (diff float64, why string, err error) 
 	return diff, "", nil
 }
 
+// fourierNoise is the allowance for operations that go through FFTW.
+//
+// FFTW picks its algorithm at run time, and the choice is not stable across
+// processes: the same transform planned two ways gives answers that differ in
+// the last bits, which becomes one unit after rounding to eight bits per
+// sample. Both sides here are the same libvips calling the same FFTW, so
+// neither is wrong; they simply cannot be required to agree exactly.
+//
+// This is a measured list, not a guess, and not a blanket epsilon. Pinning
+// VIPS_CONCURRENCY to one on both sides — which does fix the thread-order drift
+// in stats — leaves phasecor still disagreeing on roughly one run in ten, and
+// re-sampling the CLI ten times per mismatch still misses it. Anything not
+// named here is required to match to the bit.
+func fourierNoise(op string) float64 {
+	switch {
+	case strings.Contains(op, "fft"), op == "phasecor", op == "spectrum":
+		return 1
+	}
+	return 0
+}
+
 // oracleIsStable reports whether the CLI agrees with itself on an operation.
 //
 // Some libvips operations reduce over the whole image with one accumulator per
@@ -360,12 +395,15 @@ func compareSaved(cliPath, goPath string) (diff float64, why string, err error) 
 // epsilon, which would also swallow real breakage.
 func oracleIsStable(t *testing.T, p plan, dir string) (bool, float64) {
 	t.Helper()
-	const reruns = 3
+	// This catches operations whose answer moves between runs for reasons other
+	// than FFTW planning — stats and the other whole-image reductions. It only
+	// runs after a mismatch, so the cost is paid rarely.
+	const reruns = 5
 	worst := 0.0
 	for i := range reruns {
 		again := filepath.Join(dir, fmt.Sprintf("%s.recheck%d.png", p.op, i))
 		args := append([]string{p.op}, replaceOut(p.cliArgs, p.outPath, again)...)
-		if out, err := exec.Command("vips", args...).CombinedOutput(); err != nil {
+		if out, err := runCLI(args...); err != nil {
 			t.Fatalf("re-running the CLI: %v\n%s", err, out)
 		}
 		var d float64
@@ -452,8 +490,7 @@ func compareAll(t *testing.T, dir string, paths []string, ops []string) {
 			viaGo = filepath.Join(dir, op+suffix+".go"+saverExtension(op))
 		}
 
-		cliOut, cliErr := exec.Command("vips",
-			append([]string{op}, p.cliArgs...)...).CombinedOutput()
+		cliOut, cliErr := runCLI(append([]string{op}, p.cliArgs...)...)
 
 		callArgs := p.callArgs
 		if p.savesToFile {
@@ -515,6 +552,11 @@ func compareAll(t *testing.T, dir string, paths []string, ops []string) {
 		if diff == 0 {
 			return
 		}
+		if allowed := fourierNoise(op); diff <= allowed {
+			unstable++
+			t.Skipf("within FFTW's planning noise: differs by %v, allowed %v",
+				diff, allowed)
+		}
 		if stable, selfDiff := oracleIsStable(t, p, dir); !stable {
 			unstable++
 			t.Skipf("libvips is not reproducible here: CLI runs differ by %v, "+
@@ -571,4 +613,10 @@ func compareAll(t *testing.T, dir string, paths []string, ops []string) {
 	for _, why := range reasons[:min(len(reasons), 6)] {
 		t.Logf("  not drivable, %3d ops: %s", undrivableWhy[why], why)
 	}
+}
+
+func TestMain(m *testing.M) {
+	// Match the command line, which every comparison pins to one thread.
+	vips.SetConcurrency(1)
+	os.Exit(m.Run())
 }

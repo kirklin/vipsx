@@ -117,22 +117,27 @@ func formatCLI(v any) (string, bool) {
 
 // enumNick picks a member of an enum or flags type to test with.
 //
-// The first non-zero member, so the value being sent is visibly different from
-// what an unset argument would produce. Falls back to whatever exists.
+// The first member above zero, so the value being sent is visibly different
+// from what an unset argument would produce. Above zero rather than merely
+// non-zero: several libvips enums start with a negative sentinel, and
+// VipsBandFormat's is VIPS_FORMAT_NOTSET at -1. Casting an image to that and
+// then saving it aborts the process on a libvips assertion.
 func enumNick(typeName string) (nick string, number int, ok bool) {
 	members := vips.EnumValues(typeName)
 	if len(members) == 0 {
 		return "", 0, false
 	}
 	for _, m := range members {
-		if m.Value != 0 && m.Nick != "" {
+		if m.Value > 0 && m.Nick != "" {
 			return m.Nick, m.Value, true
 		}
 	}
-	if members[0].Nick == "" {
-		return "", 0, false
+	for _, m := range members {
+		if m.Value == 0 && m.Nick != "" {
+			return m.Nick, m.Value, true
+		}
 	}
-	return members[0].Nick, members[0].Value, true
+	return "", 0, false
 }
 
 // optionalValueFor produces an optional argument as the command line spells it:
