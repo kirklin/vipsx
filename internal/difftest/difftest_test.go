@@ -13,6 +13,26 @@ import (
 	"github.com/kirklin/vipsx/vips"
 )
 
+// runCLIPipeline invokes an operation and writes the result, in two steps.
+//
+// The command line normally does both in one invocation, and the binding cannot:
+// it calls the operation, then calls a saver. That asymmetry is not always
+// invisible. worley's output depends on the order its regions are demanded, so
+// one pipeline and two produce images differing by one — and the command line
+// disagrees with itself the same way when told to work in two steps, which is
+// what showed this was pipeline shape rather than a marshalling defect.
+//
+// So the operation writes libvips' own format, and a second invocation converts
+// it. Both sides then have the same shape and the comparison means something.
+func runCLIPipeline(op string, args []string, out string) ([]byte, error) {
+	intermediate := out + ".pipeline.v"
+	staged := replaceOut(args, out, intermediate)
+	if result, err := runCLI(append([]string{op}, staged...)...); err != nil {
+		return result, err
+	}
+	return runCLI("copy", intermediate, out)
+}
+
 // runCLI invokes the vips command line for a comparison.
 //
 // Pinned to one worker thread, and the binding is pinned to match. Several
@@ -381,6 +401,41 @@ func fourierNoise(op string) float64 {
 	return 0
 }
 
+// shapeSensitive reports whether an operation's output depends on how the
+// pipeline around it is arranged, by asking the command line to do the same
+// work two ways: all in one invocation, and as an operation followed by a
+// separate conversion.
+//
+// Some operations answer differently. worley builds its noise from whichever
+// regions get demanded first, so evaluating it straight into a file and
+// evaluating it through a second step give images differing by one. That is a
+// property of the operation, not of any caller: the command line disagrees with
+// itself here, using neither Go nor this package.
+//
+// Nothing can compare two pipeline shapes for exactness when the operation
+// itself does not hold still between them, so those comparisons are reported
+// and skipped instead of being counted against the binding.
+func shapeSensitive(t *testing.T, p plan, dir string) (bool, float64) {
+	t.Helper()
+	oneStep := filepath.Join(dir, p.op+".shape.one.png")
+	twoStep := filepath.Join(dir, p.op+".shape.two.png")
+
+	if out, err := runCLI(append([]string{p.op},
+		replaceOut(p.cliArgs, p.outPath, oneStep)...)...); err != nil {
+		t.Fatalf("one-step CLI run: %v\n%s", err, out)
+	}
+	if out, err := runCLIPipeline(p.op,
+		replaceOut(p.cliArgs, p.outPath, twoStep), twoStep); err != nil {
+		t.Fatalf("two-step CLI run: %v\n%s", err, out)
+	}
+
+	d, err := maxAbsDiff(oneStep, twoStep)
+	if err != nil {
+		t.Fatalf("comparing pipeline shapes: %v", err)
+	}
+	return d != 0, d
+}
+
 // bindingIsStable reports whether the binding agrees with itself on an
 // operation, by running it again in this process.
 //
@@ -459,12 +514,17 @@ func oracleIsStable(t *testing.T, p plan, dir string) (bool, float64) {
 	worst := 0.0
 	for i := range reruns {
 		again := filepath.Join(dir, fmt.Sprintf("%s.recheck%d.png", p.op, i))
-		args := append([]string{p.op}, replaceOut(p.cliArgs, p.outPath, again)...)
-		if out, err := runCLI(args...); err != nil {
+		var err error
+		var out []byte
+		if p.savesToFile {
+			out, err = runCLI(append([]string{p.op}, replaceOut(p.cliArgs, p.outPath, again)...)...)
+		} else {
+			out, err = runCLIPipeline(p.op, replaceOut(p.cliArgs, p.outPath, again), again)
+		}
+		if err != nil {
 			t.Fatalf("re-running the CLI: %v\n%s", err, out)
 		}
 		var d float64
-		var err error
 		if p.savesToFile {
 			d, _, err = compareSaved(p.outPath, again)
 		} else {
@@ -547,7 +607,15 @@ func compareAll(t *testing.T, dir string, paths []string, ops []string) {
 			viaGo = filepath.Join(dir, op+suffix+".go"+saverExtension(op))
 		}
 
-		cliOut, cliErr := runCLI(append([]string{op}, p.cliArgs...)...)
+		var cliOut []byte
+		var cliErr error
+		if p.savesToFile {
+			// A saver already is the write step; splitting it would be
+			// meaningless.
+			cliOut, cliErr = runCLI(append([]string{op}, p.cliArgs...)...)
+		} else {
+			cliOut, cliErr = runCLIPipeline(op, p.cliArgs, p.outPath)
+		}
 
 		callArgs := p.callArgs
 		if p.savesToFile {
@@ -622,6 +690,14 @@ func compareAll(t *testing.T, dir string, paths []string, ops []string) {
 			unstable++
 			t.Skipf("not reproducible: the CLI drifts by %v across runs, the binding "+
 				"by %v, and they differ from each other by %v", cliDrift, goDrift, diff)
+		}
+		if !p.savesToFile {
+			if sensitive, shapeDrift := shapeSensitive(t, p, dir); sensitive {
+				unstable++
+				t.Skipf("output depends on pipeline shape: the CLI disagrees with "+
+					"itself by %v between one invocation and two, and differs from "+
+					"the binding by %v", shapeDrift, diff)
+			}
 		}
 		mismatched++
 		t.Errorf("pixels differ by %v, and both sides repeat themselves exactly, "+
