@@ -24,6 +24,20 @@
 #error "vipsx needs libvips 8.14 or newer"
 #endif
 
+// Feature test for everything above the floor.
+//
+// The floor is not the ceiling: libvips keeps adding, and a binding that can
+// only use the intersection of every supported version is stuck at the oldest
+// one forever. Guarding a feature lets it be used where it exists and reported
+// as missing where it does not, rather than forcing the floor up.
+//
+// Where a guard compiles a function out, its shim returns 0 and the Go side
+// turns that into an error naming the version needed. Nothing silently does
+// nothing.
+#define VIPSX_AT_LEAST(major, minor)                                           \
+  (VIPS_MAJOR_VERSION > (major) ||                                             \
+   (VIPS_MAJOR_VERSION == (major) && VIPS_MINOR_VERSION >= (minor)))
+
 // The complete type surface of the libvips operation API. Every argument of
 // every operation is one of these; there is no eighteenth case.
 #define VIPSX_KIND_UNKNOWN 0
@@ -234,5 +248,14 @@ int vipsx_tracked_allocs(void);
 int vipsx_tracked_files(void);
 
 char *vipsx_error_buffer_copy(void);
+
+// Hardening, for a process that decodes images it did not choose.
+//
+// Each returns 1 when the underlying libvips call was made and 0 when this
+// libvips is too old to have it, so the Go side can say which version is
+// wanted instead of quietly doing nothing.
+int vipsx_block_untrusted_set(int state);
+int vipsx_operation_block_set(const char *name, int state);
+int vipsx_pipe_read_limit_set(gint64 limit);
 
 #endif
