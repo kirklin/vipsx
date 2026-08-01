@@ -304,7 +304,7 @@ int vipsx_band_format_isint(int format);
 int vipsx_band_format_isuint(int format);
 int vipsx_band_format_isfloat(int format);
 int vipsx_band_format_iscomplex(int format);
-double vipsx_interpretation_max_alpha(int interpretation);
+int vipsx_interpretation_max_alpha(int interpretation, double *out);
 int vipsx_max_coord_get(void);
 char **vipsx_foreign_get_suffixes(void);
 int vipsx_foreign_flags(const char *loader, const char *filename);

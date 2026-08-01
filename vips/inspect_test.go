@@ -92,8 +92,22 @@ func TestMaxAlpha(t *testing.T) {
 		vips.InterpretationRgb16: 65535,
 		vips.InterpretationScrgb: 1,
 	}
+	major, minor, _ := vips.VersionParts()
+	old := major < 8 || (major == 8 && minor < 15)
+
 	for interp, want := range cases {
-		if got := vips.MaxAlpha(int(interp)); got != want {
+		got, err := vips.MaxAlpha(int(interp))
+		if old {
+			if err == nil {
+				t.Errorf("MaxAlpha succeeded on libvips %s, which is older than 8.15", vips.Version())
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("MaxAlpha(%s): %v", interp, err)
+			continue
+		}
+		if got != want {
 			t.Errorf("MaxAlpha(%s) = %v, want %v", interp, got, want)
 		}
 	}
