@@ -127,8 +127,14 @@ static int vipsx_set_one(VipsOperation *op, VipsxArg *arg) {
   }
   case VIPSX_KIND_BLOB: {
     // libvips may outlive the caller's buffer, so hand it memory it owns.
-    void *copy = g_malloc(arg->n);
-    memcpy(copy, arg->p, arg->n);
+    void *copy = g_try_malloc(arg->n ? arg->n : 1);
+    if (!copy) {
+      g_value_unset(&gv);
+      vips_error("vipsx", "out of memory copying argument '%s'", arg->name);
+      return -1;
+    }
+    if (arg->p && arg->n)
+      memcpy(copy, arg->p, arg->n);
     vips_value_set_blob_free(&gv, copy, arg->n);
     break;
   }
@@ -182,13 +188,17 @@ static int vipsx_get_one(VipsOperation *op, VipsxOut *out) {
     break;
   case VIPSX_KIND_STRING: {
     const char *s = g_value_get_string(&gv);
-    out->s = strdup(s ? s : "");
+    out->s = vipsx_dup(s);
+    if (!out->s)
+      goto no_memory;
     break;
   }
   case VIPSX_KIND_REFSTRING: {
     size_t len = 0;
     const char *s = vips_value_get_ref_string(&gv, &len);
-    out->s = strdup(s ? s : "");
+    out->s = vipsx_dup(s);
+    if (!out->s)
+      goto no_memory;
     break;
   }
   case VIPSX_KIND_ENUM:
@@ -208,25 +218,33 @@ static int vipsx_get_one(VipsOperation *op, VipsxOut *out) {
     int n = 0;
     int *a = vips_value_get_array_int(&gv, &n);
     out->n = (size_t)n;
-    out->arr = malloc(n * sizeof(int));
-    memcpy(out->arr, a, n * sizeof(int));
+    out->arr = vipsx_alloc0((size_t)n * sizeof(int));
+    if (!out->arr)
+      goto no_memory;
+    if (a && n > 0)
+      memcpy(out->arr, a, (size_t)n * sizeof(int));
     break;
   }
   case VIPSX_KIND_ARRAY_DOUBLE: {
     int n = 0;
     double *a = vips_value_get_array_double(&gv, &n);
     out->n = (size_t)n;
-    out->arr = malloc(n * sizeof(double));
-    memcpy(out->arr, a, n * sizeof(double));
+    out->arr = vipsx_alloc0((size_t)n * sizeof(double));
+    if (!out->arr)
+      goto no_memory;
+    if (a && n > 0)
+      memcpy(out->arr, a, (size_t)n * sizeof(double));
     break;
   }
   case VIPSX_KIND_ARRAY_IMAGE: {
     int n = 0;
     VipsImage **a = vips_value_get_array_image(&gv, &n);
     out->n = (size_t)n;
-    out->arr = malloc(n * sizeof(VipsImage *));
+    out->arr = vipsx_alloc0((size_t)n * sizeof(VipsImage *));
+    if (!out->arr)
+      goto no_memory;
     VipsImage **dst = (VipsImage **)out->arr;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; a && i < n; i++) {
       g_object_ref(a[i]);
       dst[i] = a[i];
     }
@@ -236,8 +254,11 @@ static int vipsx_get_one(VipsOperation *op, VipsxOut *out) {
     size_t len = 0;
     const void *data = vips_value_get_blob(&gv, &len);
     out->n = len;
-    out->arr = malloc(len);
-    memcpy(out->arr, data, len);
+    out->arr = vipsx_alloc0(len);
+    if (!out->arr)
+      goto no_memory;
+    if (data && len > 0)
+      memcpy(out->arr, data, len);
     break;
   }
   default:
@@ -249,6 +270,11 @@ static int vipsx_get_one(VipsOperation *op, VipsxOut *out) {
 
   g_value_unset(&gv);
   return 0;
+
+no_memory:
+  g_value_unset(&gv);
+  vips_error("vipsx", "out of memory reading output '%s'", out->name);
+  return -1;
 }
 
 void vipsx_out_clear(VipsxOut *outs, int n_outs) {
