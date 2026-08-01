@@ -19,7 +19,7 @@ func TestFormatSizeof(t *testing.T) {
 		{vips.BandFormatDouble, 8},
 	}
 	for _, tc := range cases {
-		if got := vips.FormatSizeof(tc.format); got != tc.want {
+		if got := vips.FormatSizeof(int(tc.format)); got != tc.want {
 			t.Errorf("FormatSizeof(%s) = %d, want %d", tc.format, got, tc.want)
 		}
 	}
@@ -36,7 +36,7 @@ func TestPixelsRoundTripThroughMemory(t *testing.T) {
 		pix[i] = byte(i * 7)
 	}
 
-	im, err := vips.NewImageFromMemory(pix, w, h, bands, vips.BandFormatUchar)
+	im, err := vips.NewImageFromMemory(pix, w, h, bands, int(vips.BandFormatUchar))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestNewImageFromMemoryCopiesTheBuffer(t *testing.T) {
 	const w, h, bands = 8, 8, 1
 
 	pix := bytes.Repeat([]byte{0x42}, w*h*bands)
-	im, err := vips.NewImageFromMemory(pix, w, h, bands, vips.BandFormatUchar)
+	im, err := vips.NewImageFromMemory(pix, w, h, bands, int(vips.BandFormatUchar))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestNewImageFromMemoryCopiesTheBuffer(t *testing.T) {
 
 func TestNewImageFromMemoryRejectsAShortBuffer(t *testing.T) {
 	short := make([]byte, 10)
-	if im, err := vips.NewImageFromMemory(short, 100, 100, 3, vips.BandFormatUchar); err == nil {
+	if im, err := vips.NewImageFromMemory(short, 100, 100, 3, int(vips.BandFormatUchar)); err == nil {
 		im.Close()
 		t.Fatal("a buffer far too small for the dimensions was accepted")
 	}
@@ -95,7 +95,7 @@ func TestNewImageFromMemoryRejectsAShortBuffer(t *testing.T) {
 func TestNewImageFromMemoryRejectsBadDimensions(t *testing.T) {
 	pix := make([]byte, 64)
 	for _, tc := range []struct{ w, h, bands int }{{0, 8, 1}, {8, 0, 1}, {8, 8, 0}, {-1, 8, 1}} {
-		if im, err := vips.NewImageFromMemory(pix, tc.w, tc.h, tc.bands, vips.BandFormatUchar); err == nil {
+		if im, err := vips.NewImageFromMemory(pix, tc.w, tc.h, tc.bands, int(vips.BandFormatUchar)); err == nil {
 			im.Close()
 			t.Errorf("%dx%d with %d bands was accepted", tc.w, tc.h, tc.bands)
 		}
@@ -109,7 +109,7 @@ func TestWriteToMemoryIsRawPixelsNotAnEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := im.Width() * im.Height() * im.Bands() * vips.FormatSizeof(vips.BandFormat(im.Format()))
+	want := im.Width() * im.Height() * im.Bands() * vips.FormatSizeof(im.Format())
 	if len(raw) != want {
 		t.Fatalf("got %d bytes, want %d for %dx%d with %d bands",
 			len(raw), want, im.Width(), im.Height(), im.Bands())

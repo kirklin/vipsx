@@ -14,7 +14,14 @@ import (
 
 // FormatSizeof reports how many bytes one band of one pixel takes in the given
 // band format. Multiply by bands and by width×height for a raw buffer's size.
-func FormatSizeof(format BandFormat) int {
+//
+// The format is a VipsBandFormat as an int, which is what (*Image).Format
+// reports and what the generated BandFormat constants are: pass im.Format()
+// straight through, or int(vips.BandFormatUchar) for a literal. This layer
+// takes the int because the generator imports it, and a hand-written file that
+// referred to a generated type could not be compiled before the generated
+// files existed.
+func FormatSizeof(format int) int {
 	return int(C.vipsx_format_sizeof(C.int(format)))
 }
 
@@ -34,7 +41,13 @@ func FormatSizeof(format BandFormat) int {
 // deliberately not exposed: it keeps the caller's pointer for the life of the
 // image, and Go memory belongs to a collector that is free to move or reclaim
 // it. The copy is one memcpy against the cost of an image.
-func NewImageFromMemory(data []byte, width, height, bands int, format BandFormat) (*Image, error) {
+//
+// format is a VipsBandFormat as an int; see FormatSizeof. The round trip needs
+// no conversion at all:
+//
+//	raw, _ := im.WriteToMemory()
+//	same, _ := vips.NewImageFromMemory(raw, im.Width(), im.Height(), im.Bands(), im.Format())
+func NewImageFromMemory(data []byte, width, height, bands int, format int) (*Image, error) {
 	if err := Startup(); err != nil {
 		return nil, err
 	}
@@ -49,7 +62,7 @@ func NewImageFromMemory(data []byte, width, height, bands int, format BandFormat
 	if len(data) < want {
 		return nil, &Error{
 			Op: "new_from_memory",
-			Message: fmt.Sprintf("buffer is %d bytes, need %d for %dx%d with %d bands of %s",
+			Message: fmt.Sprintf("buffer is %d bytes, need %d for %dx%d with %d bands of format %d",
 				len(data), want, width, height, bands, format),
 		}
 	}

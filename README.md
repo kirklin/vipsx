@@ -228,7 +228,7 @@ For pixels that did not come from a file — another library's decoder, a
 framebuffer, a Go `image.Image`:
 
 ```go
-im, _ := vips.NewImageFromMemory(pix, w, h, 3, vips.BandFormatUchar)
+im, _ := vips.NewImageFromMemory(pix, w, h, 3, im.Format())
 out, _ := im.WriteToMemory()   // band-packed rows, not an encoding
 ```
 
