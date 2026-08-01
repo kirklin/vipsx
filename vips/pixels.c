@@ -36,3 +36,11 @@ VipsImage *vipsx_image_copy_memory(VipsImage *image) {
 guint64 vipsx_format_sizeof(int format) {
   return vips_format_sizeof((VipsBandFormat)format);
 }
+
+// The zero-copy read: renders the pipeline and hands back the image's own
+// buffer rather than a copy of it. Nothing is transferred — the pointer is
+// valid for as long as the image is, which is why the Go side lends it to a
+// callback instead of returning it.
+const void *vipsx_image_get_data(VipsImage *image) {
+  return vips_image_get_data(image);
+}

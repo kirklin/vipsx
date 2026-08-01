@@ -290,5 +290,35 @@ VipsImage *vipsx_image_new_from_memory(const void *data, size_t size, int width,
 void *vipsx_image_write_to_memory(VipsImage *image, size_t *size);
 VipsImage *vipsx_image_copy_memory(VipsImage *image);
 guint64 vipsx_format_sizeof(int format);
+const void *vipsx_image_get_data(VipsImage *image);
+
+// Questions about an image, a format, or the library, that do not run an
+// operation. See inspect.c.
+int vipsx_image_get_orientation_swap(VipsImage *image);
+int vipsx_image_guess_format(VipsImage *image);
+int vipsx_image_guess_interpretation(VipsImage *image);
+const char *vipsx_image_get_filename(VipsImage *image);
+const char *vipsx_image_get_history(VipsImage *image);
+int vipsx_band_format_is8bit(int format);
+int vipsx_band_format_isint(int format);
+int vipsx_band_format_isuint(int format);
+int vipsx_band_format_isfloat(int format);
+int vipsx_band_format_iscomplex(int format);
+double vipsx_interpretation_max_alpha(int interpretation);
+int vipsx_max_coord_get(void);
+char **vipsx_foreign_get_suffixes(void);
+int vipsx_foreign_flags(const char *loader, const char *filename);
+char *vipsx_filename_get_filename(const char *name);
+char *vipsx_filename_get_options(const char *name);
+void vipsx_image_minimise_all(VipsImage *image);
+void vipsx_image_invalidate_all(VipsImage *image);
+void vipsx_error_freeze(void);
+void vipsx_error_thaw(void);
+VipsSource *vipsx_source_new_from_descriptor(int fd);
+VipsTarget *vipsx_target_new_to_descriptor(int fd);
+const void *vipsx_source_sniff(VipsSource *source, size_t length);
+gint64 vipsx_source_length(VipsSource *source);
+void vipsx_source_minimise(VipsSource *source);
+void vipsx_source_unminimise(VipsSource *source);
 
 #endif

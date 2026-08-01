@@ -7,6 +7,8 @@ package vips
 import "C"
 
 import (
+	"fmt"
+	"os"
 	"runtime"
 	"sync/atomic"
 	"unsafe"
@@ -98,6 +100,10 @@ type Source struct {
 	// handle rather than only in the registry so Err keeps working after
 	// Close; the registry entry itself lasts as long as the C object does.
 	st *stream
+	// file is non-nil when the source reads a descriptor. libvips neither dups
+	// nor closes it, so holding the *os.File here is what stops a collector
+	// closing the descriptor out from under libvips.
+	file *os.File
 }
 
 // NewSourceFromFile opens a file as a source.
@@ -136,6 +142,89 @@ func NewSourceFromBytes(data []byte) (*Source, error) {
 	return s, nil
 }
 
+// NewSourceFromOpenFile reads an image through an already-open file's
+// descriptor.
+//
+// This is the cheapest way in for something that is already a file. The
+// io.Reader path crosses into Go for every read — a cgo call, a registry
+// lookup and a callback each time — while this one leaves libvips reading the
+// descriptor directly.
+//
+// libvips neither duplicates nor closes the descriptor, so f must stay open for
+// as long as the source is used, and closing it stays the caller's job. The
+// source holds a reference to f so a collector cannot close it early; that is
+// the one part the caller does not have to think about.
+//
+//	f, err := os.Open("photo.jpg")
+//	if err != nil { return err }
+//	defer f.Close()
+//
+//	src, err := vips.NewSourceFromOpenFile(f)
+//	if err != nil { return err }
+//	defer src.Close()
+func NewSourceFromOpenFile(f *os.File) (*Source, error) {
+	if err := Startup(); err != nil {
+		return nil, err
+	}
+	if f == nil {
+		return nil, &Error{Op: "source", Message: "nil file"}
+	}
+	p := C.vipsx_source_new_from_descriptor(C.int(f.Fd()))
+	if p == nil {
+		return nil, &Error{Op: "source", Message: lastError()}
+	}
+	s := &Source{file: f}
+	s.init(unsafe.Pointer(p))
+	return s, nil
+}
+
+// Sniff copies the first n bytes of a source without consuming them, so the
+// loader that runs next still reads from the start.
+//
+// This is where a format check of your own goes — a magic-number allowlist
+// stricter than the loaders libvips is willing to try. It reports an error when
+// the source is shorter than n.
+func (s *Source) Sniff(n int) ([]byte, error) {
+	p := s.live("Source.Sniff")
+	defer runtime.KeepAlive(s)
+	if n <= 0 {
+		return nil, &Error{Op: "source", Message: "sniff length must be positive"}
+	}
+	data := C.vipsx_source_sniff((*C.VipsSource)(p), C.size_t(n))
+	if data == nil {
+		return nil, &Error{Op: "source",
+			Message: fmt.Sprintf("fewer than %d bytes available", n)}
+	}
+	return goBytes(data, C.size_t(n)), nil
+}
+
+// Length reports how many bytes the source holds, or -1 when it cannot say —
+// an unseekable stream does not know until it has read to the end.
+//
+// A cheap first gate for a size limit, before any decoding happens.
+func (s *Source) Length() int64 {
+	p := s.live("Source.Length")
+	defer runtime.KeepAlive(s)
+	return int64(C.vipsx_source_length((*C.VipsSource)(p)))
+}
+
+// Minimise releases what the source is holding open, keeping it usable: the
+// next read reopens whatever it needs.
+//
+// For a process juggling more sources than it has descriptors.
+func (s *Source) Minimise() {
+	p := s.live("Source.Minimise")
+	defer runtime.KeepAlive(s)
+	C.vipsx_source_minimise((*C.VipsSource)(p))
+}
+
+// Unminimise undoes Minimise, reopening ahead of a read rather than during one.
+func (s *Source) Unminimise() {
+	p := s.live("Source.Unminimise")
+	defer runtime.KeepAlive(s)
+	C.vipsx_source_unminimise((*C.VipsSource)(p))
+}
+
 // Close releases the source, and the reader behind it when there is one.
 //
 // Any image loaded from the source must be evaluated or closed first: a demand
@@ -170,6 +259,8 @@ type Target struct {
 	// st is non-nil when the bytes go to an io.Writer. On the handle rather
 	// than only in the registry so Err keeps working after Close.
 	st *stream
+	// file is non-nil when the target writes to a descriptor; see Source.file.
+	file *os.File
 }
 
 // NewTargetToFile creates a target writing to a file.
@@ -200,6 +291,25 @@ func NewTargetToMemory() (*Target, error) {
 		return nil, &Error{Op: "target", Message: lastError()}
 	}
 	t := &Target{memory: true}
+	t.init(unsafe.Pointer(p))
+	return t, nil
+}
+
+// NewTargetToOpenFile writes an image through an already-open file's
+// descriptor. See NewSourceFromOpenFile for what libvips does and does not do
+// with it.
+func NewTargetToOpenFile(f *os.File) (*Target, error) {
+	if err := Startup(); err != nil {
+		return nil, err
+	}
+	if f == nil {
+		return nil, &Error{Op: "target", Message: "nil file"}
+	}
+	p := C.vipsx_target_new_to_descriptor(C.int(f.Fd()))
+	if p == nil {
+		return nil, &Error{Op: "target", Message: lastError()}
+	}
+	t := &Target{file: f}
 	t.init(unsafe.Pointer(p))
 	return t, nil
 }
