@@ -3,6 +3,7 @@ package vips_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kirklin/vipsx/vips"
@@ -356,21 +357,60 @@ func TestNoUnknownArgumentKinds(t *testing.T) {
 // Bits outside a flags type are rejected here because GLib will not reject
 // them: property validation masks unknown bits off silently, so a typo'd flag
 // would simply not happen, with nothing saying so.
+//
+// The argument is found by introspection rather than named. Which operations
+// carry a flags argument moves between libvips versions — jpegsave's "keep"
+// replaced "strip" in 8.15 — and naming one turns this into a test of the
+// installed version instead of a test of the check. Marshalling runs before
+// the operation is built, so the value under test is reached without supplying
+// the operation's other arguments; what is asserted is which error comes back,
+// not that the call succeeds.
 func TestFlagsBitsAreValidated(t *testing.T) {
-	im := load(t, "noise.png")
+	op, arg, typeName := findFlagsArg(t)
+	if op == "" {
+		t.Skip("this libvips has no operation with a flags input argument")
+	}
+	t.Logf("checking %s.%s (%s)", op, arg, typeName)
 
-	// "keep" on jpegsave_buffer is VipsForeignKeep. Send a bit far outside it.
-	_, err := vips.Call("jpegsave_buffer", vips.In("in", im), vips.In("keep", 1<<20))
+	const outside = "bits outside"
+
+	_, err := vips.Call(op, vips.In(arg, 1<<20))
 	if err == nil {
-		t.Fatal("a flags value with bits outside the type was accepted")
+		t.Fatalf("%s.%s accepted a value with bits outside %s", op, arg, typeName)
+	}
+	if !strings.Contains(err.Error(), outside) {
+		t.Fatalf("%s.%s rejected the value for the wrong reason: %v", op, arg, err)
 	}
 
-	// A legitimate combination still goes through.
-	outs, err := vips.Call("jpegsave_buffer", vips.In("in", im), vips.In("keep", 0))
-	if err != nil {
-		t.Fatalf("keep=0 rejected: %v", err)
+	// Zero sets no bits, so it is inside every flags type. The call still fails
+	// for want of the required arguments; it must not fail for this reason.
+	if _, err := vips.Call(op, vips.In(arg, 0)); err != nil &&
+		strings.Contains(err.Error(), outside) {
+		t.Errorf("%s.%s rejected zero as out of range: %v", op, arg, err)
 	}
-	outs.Close()
+}
+
+// findFlagsArg returns the first operation carrying a flags input argument
+// whose type has known members. Operations is sorted, so the choice is the
+// same on every run against a given libvips.
+func findFlagsArg(t *testing.T) (op, arg, typeName string) {
+	t.Helper()
+	for _, name := range vips.Operations() {
+		spec, err := vips.Describe(name)
+		if err != nil {
+			continue
+		}
+		for _, a := range spec.Args {
+			if a.Deprecated || !a.Input || a.Kind != vips.KindFlags {
+				continue
+			}
+			if len(vips.EnumValues(a.TypeName)) == 0 {
+				continue // nothing known about the type, so nothing to check against
+			}
+			return name, a.Name, a.TypeName
+		}
+	}
+	return "", "", ""
 }
 
 func TestEnumValues(t *testing.T) {
