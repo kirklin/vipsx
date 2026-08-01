@@ -164,7 +164,7 @@ func TestTypedHandles(t *testing.T) {
 	defer interp.Close()
 
 	out, err := vips.Affine(src, []float64{0.5, 0, 0, 0.5}, &vips.AffineOptions{
-		Interpolate: vips.Ptr(interp),
+		Interpolate: interp,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -216,26 +216,35 @@ func TestMetadata(t *testing.T) {
 		t.Fatal("no metadata fields")
 	}
 
-	src.SetString("vipsx-test", "hello")
-	if v, err := src.GetString("vipsx-test"); err != nil || v != "hello" {
+	// Mutate a copy: the loaded image is shared through the operation cache,
+	// and fields written here would otherwise ride along on every later load
+	// of the fixture — this test used to leave one behind.
+	own, err := vips.Copy(src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer own.Close()
+
+	own.SetString("vipsx-test", "hello")
+	if v, err := own.GetString("vipsx-test"); err != nil || v != "hello" {
 		t.Errorf("string round trip: %q %v", v, err)
 	}
-	src.SetInt("vipsx-int", 0)
-	if v, err := src.GetInt("vipsx-int"); err != nil || v != 0 {
+	own.SetInt("vipsx-int", 0)
+	if v, err := own.GetInt("vipsx-int"); err != nil || v != 0 {
 		t.Errorf("int round trip: %v %v", v, err)
 	}
-	if !src.RemoveField("vipsx-test") {
+	if !own.RemoveField("vipsx-test") {
 		t.Error("RemoveField reported nothing removed")
 	}
-	if src.HasField("vipsx-test") {
+	if own.HasField("vipsx-test") {
 		t.Error("field survived removal")
 	}
 
-	if src.Orientation() < 1 {
-		t.Errorf("orientation should default to 1, got %d", src.Orientation())
+	if own.Orientation() < 1 {
+		t.Errorf("orientation should default to 1, got %d", own.Orientation())
 	}
-	if src.Pages() != 1 {
-		t.Errorf("pages: got %d, want 1", src.Pages())
+	if own.Pages() != 1 {
+		t.Errorf("pages: got %d, want 1", own.Pages())
 	}
 }
 
@@ -428,7 +437,15 @@ func TestStripRefusesStructuralFields(t *testing.T) {
 // height. The fields are set by hand because that is what gifload sets, minus
 // the dependency on a GIF encoder being compiled in.
 func TestStripKeepsAnimationTiming(t *testing.T) {
-	im := loadTyped(t, "noise.png")
+	src := loadTyped(t, "noise.png")
+
+	// On a copy, like the other Strip tests: the shared load must not carry
+	// these fields into whatever test loads the fixture next.
+	im, err := vips.Copy(src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer im.Close()
 	im.SetInts("delay", []int{40, 40, 40})
 	im.SetInt("loop", 3)
 	im.SetInt("gif-delay", 4)

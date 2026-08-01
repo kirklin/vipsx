@@ -218,12 +218,15 @@ func Ptr[T any](v T) *T { return &v }
 	for _, spec := range specs {
 		fn := exported(spec.Name)
 		if fn == "" || seen[fn] {
+			// Named, because a silent count is not something anyone can act on.
+			log.Printf("skipping %s: exported name %q is empty or already taken", spec.Name, fn)
 			skipped++
 			continue
 		}
 
-		code, ok := g.renderOp(spec, fn)
-		if !ok {
+		code, why := g.renderOp(spec, fn)
+		if why != "" {
+			log.Printf("skipping %s: %s", spec.Name, why)
 			skipped++
 			continue
 		}
@@ -240,8 +243,10 @@ type param struct {
 	goType string
 }
 
-func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, bool) {
-	var required, optional, outputs []param
+// renderOp writes one wrapper. A non-empty second return is the reason the
+// operation cannot be rendered and must be skipped.
+func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, string) {
+	var required, optional, outputs, optOutputs []param
 
 	for _, a := range spec.Args {
 		if a.Deprecated {
@@ -249,36 +254,76 @@ func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, bool) {
 		}
 		t, ok := g.goType(a)
 		if !ok {
-			return "", false // an argument this generator cannot type
+			return "", fmt.Sprintf("argument %q has untypable kind %s", a.Name, a.Kind)
 		}
 		p := param{arg: a, goName: identifier(a.Name), goType: t}
 
 		switch {
 		case a.Input && a.Required:
 			required = append(required, p)
+			// An argument the operation modifies in place is an output in
+			// every sense that matters: Call substitutes a private copy and
+			// returns it, and this wrapper hands that copy back.
+			if a.Modify {
+				outputs = append(outputs, p)
+			}
 		case a.Input:
 			p.goName = exported(a.Name)
 			optional = append(optional, p)
 		case a.Output && a.Required:
 			outputs = append(outputs, p)
+		case a.Output:
+			p.goName = exported(a.Name)
+			if _, _, ok := outputAccessor(p); !ok {
+				// Requestable but unreadable would be worse than absent.
+				continue
+			}
+			optOutputs = append(optOutputs, p)
+		}
+	}
+
+	for _, p := range outputs {
+		if _, _, ok := outputAccessor(p); !ok {
+			return "", fmt.Sprintf("required output %q has kind %s, which Outputs cannot fetch",
+				p.arg.Name, p.arg.Kind)
 		}
 	}
 
 	var b strings.Builder
 	optType := fn + "Options"
+	hasOptions := len(optional) > 0 || len(optOutputs) > 0
 
 	// Options struct
-	if len(optional) > 0 {
+	if hasOptions {
 		fmt.Fprintf(&b, "// %s holds the optional arguments of %s.\n//\n"+
 			"// A nil field is not sent, so libvips applies its own default. A non-nil\n"+
-			"// field is sent exactly as given, including a pointer to zero.\ntype %s struct {\n",
-			optType, spec.Name, optType)
+			"// field is sent exactly as given, including a pointer to zero.",
+			optType, spec.Name)
+		if len(optOutputs) > 0 {
+			b.WriteString("\n//\n// Fields marked as outputs request an optional output: point one at a\n" +
+				"// variable and the operation's answer is written through it. A slot the\n" +
+				"// operation does not fill is left untouched.")
+		}
+		fmt.Fprintf(&b, "\ntype %s struct {\n", optType)
 		for _, p := range optional {
 			if blurb := p.arg.Blurb; blurb != "" {
-				fmt.Fprintf(&b, "\t// %s %s.\n", p.goName, strings.TrimRight(blurb, "."))
+				fmt.Fprintf(&b, "\t// %s: %s.\n", p.goName, strings.TrimRight(blurb, "."))
 			}
 			if d := formatDefault(p.arg); d != "" {
 				fmt.Fprintf(&b, "\t// libvips default: %s\n", d)
+			}
+			if isHandleKind(p.arg.Kind) {
+				// Already a pointer; a second level would say nothing.
+				fmt.Fprintf(&b, "\t%s %s\n", p.goName, p.goType)
+			} else {
+				fmt.Fprintf(&b, "\t%s *%s\n", p.goName, p.goType)
+			}
+		}
+		for _, p := range optOutputs {
+			if blurb := p.arg.Blurb; blurb != "" {
+				fmt.Fprintf(&b, "\t// %s: output — %s.\n", p.goName, strings.TrimRight(blurb, "."))
+			} else {
+				fmt.Fprintf(&b, "\t// %s: output.\n", p.goName)
 			}
 			fmt.Fprintf(&b, "\t%s *%s\n", p.goName, p.goType)
 		}
@@ -293,12 +338,18 @@ func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, bool) {
 			fmt.Fprintf(&b, "//\n// %s: %s.\n", p.goName, strings.TrimRight(p.arg.Blurb, "."))
 		}
 	}
+	if hasModify(required) {
+		b.WriteString("//\n// In libvips this operation modifies an image in place. This binding never\n" +
+			"// hands it yours: Call substitutes a private copy — the image passed in may\n" +
+			"// be shared with other holders through the operation cache — libvips draws\n" +
+			"// on that copy, and the copy is what comes back. The argument is untouched.\n")
+	}
 
 	var sigParams []string
 	for _, p := range required {
 		sigParams = append(sigParams, p.goName+" "+p.goType)
 	}
-	if len(optional) > 0 {
+	if hasOptions {
 		sigParams = append(sigParams, "options *"+optType)
 	}
 
@@ -315,15 +366,19 @@ func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, bool) {
 	fmt.Fprintf(&b, "func %s(%s) %s {\n", fn, strings.Join(sigParams, ", "), retSig)
 
 	// Body
-	fmt.Fprintf(&b, "\targs := make([]Arg, 0, %d)\n", len(required)+len(optional))
+	fmt.Fprintf(&b, "\targs := make([]Arg, 0, %d)\n", len(required)+len(optional)+len(optOutputs))
 	for _, p := range required {
 		fmt.Fprintf(&b, "\targs = append(args, In(%q, %s))\n", p.arg.Name, castToArg(p))
 	}
-	if len(optional) > 0 {
+	if hasOptions {
 		b.WriteString("\tif options != nil {\n")
 		for _, p := range optional {
 			fmt.Fprintf(&b, "\t\tif options.%s != nil {\n\t\t\targs = append(args, In(%q, %s))\n\t\t}\n",
 				p.goName, p.arg.Name, derefToArg(p))
+		}
+		for _, p := range optOutputs {
+			fmt.Fprintf(&b, "\t\tif options.%s != nil {\n\t\t\targs = append(args, Out(%q))\n\t\t}\n",
+				p.goName, p.arg.Name)
 		}
 		b.WriteString("\t}\n")
 	}
@@ -340,13 +395,8 @@ func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, bool) {
 	fmt.Fprintf(&b, "\touts, err := Call(%q, args...)\n\tif err != nil {\n\t\t%s\n\t}\n",
 		spec.Name, failReturn("err"))
 
-	if len(outputs) == 0 {
-		b.WriteString("\touts.Close()\n\treturn nil\n}\n\n")
-		return b.String(), true
-	}
-
 	for i, p := range outputs {
-		accessor, cast := outputAccessor(p)
+		accessor, cast, _ := outputAccessor(p)
 		fmt.Fprintf(&b, "\tv%d, err := outs.%s(%q)\n\tif err != nil {\n\t\touts.Close()\n\t\t%s\n\t}\n",
 			i, accessor, p.arg.Name, failReturn("err"))
 		if cast != "" {
@@ -356,6 +406,33 @@ func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, bool) {
 		}
 	}
 
+	// Fill the requested output slots. This runs after the required outputs
+	// are safely fetched, so no error path can close an image already handed
+	// through a slot. Handles are deleted from the map once claimed, keeping
+	// them out of the final Close's reach.
+	if len(optOutputs) > 0 {
+		b.WriteString("\tif options != nil {\n")
+		for _, p := range optOutputs {
+			accessor, cast, _ := outputAccessor(p)
+			expr := "v"
+			if cast != "" {
+				expr = cast + "(v)"
+			}
+			fmt.Fprintf(&b, "\t\tif options.%s != nil {\n\t\t\tif v, err := outs.%s(%q); err == nil {\n\t\t\t\t*options.%s = %s\n",
+				p.goName, accessor, p.arg.Name, p.goName, expr)
+			if p.arg.Kind == vips.KindImage || p.arg.Kind == vips.KindArrayImage {
+				fmt.Fprintf(&b, "\t\t\t\tdelete(outs, %q)\n", p.arg.Name)
+			}
+			b.WriteString("\t\t\t}\n\t\t}\n")
+		}
+		b.WriteString("\t}\n")
+	}
+
+	if len(outputs) == 0 {
+		b.WriteString("\touts.Close()\n\treturn nil\n}\n\n")
+		return b.String(), ""
+	}
+
 	results := make([]string, 0, len(outputs)+1)
 	for i := range outputs {
 		results = append(results, fmt.Sprintf("r%d", i))
@@ -363,7 +440,26 @@ func (g *generator) renderOp(spec *vips.OpSpec, fn string) (string, bool) {
 	results = append(results, "nil")
 	fmt.Fprintf(&b, "\treturn %s\n}\n\n", strings.Join(results, ", "))
 
-	return b.String(), true
+	return b.String(), ""
+}
+
+func hasModify(params []param) bool {
+	for _, p := range params {
+		if p.arg.Modify {
+			return true
+		}
+	}
+	return false
+}
+
+// isHandleKind reports the kinds whose Go type is already a pointer, where an
+// optional field keeps that single pointer rather than gaining a second level.
+func isHandleKind(k vips.Kind) bool {
+	switch k {
+	case vips.KindImage, vips.KindSource, vips.KindTarget, vips.KindInterpolate:
+		return true
+	}
+	return false
 }
 
 // goType maps an argument to the Go type the generated API exposes.
@@ -413,42 +509,48 @@ func castToArg(p param) string {
 	return p.goName
 }
 
-// derefToArg renders an optional field, which is always a pointer.
+// derefToArg renders an optional field. Handle-typed fields are single
+// pointers passed as they are; everything else is a pointer to dereference.
 func derefToArg(p param) string {
+	if isHandleKind(p.arg.Kind) {
+		return "options." + p.goName
+	}
 	if p.arg.Kind == vips.KindEnum || p.arg.Kind == vips.KindFlags {
 		return "int(*options." + p.goName + ")"
 	}
 	return "*options." + p.goName
 }
 
-// outputAccessor names the Outputs method for a result, plus any cast needed to
-// reach the declared return type.
-func outputAccessor(p param) (accessor, cast string) {
+// outputAccessor names the Outputs method for a result, plus any cast needed
+// to reach the declared type. ok is false for a kind Outputs cannot fetch —
+// generating a call that fails on every use would be worse than skipping the
+// operation and saying so.
+func outputAccessor(p param) (accessor, cast string, ok bool) {
 	switch p.arg.Kind {
 	case vips.KindBool:
-		return "Bool", ""
+		return "Bool", "", true
 	case vips.KindInt:
-		return "Int", ""
+		return "Int", "", true
 	case vips.KindUint64:
-		return "Int", "int64"
+		return "Int64", "", true
 	case vips.KindDouble:
-		return "Float", ""
+		return "Float", "", true
 	case vips.KindString, vips.KindRefString:
-		return "String", ""
+		return "String", "", true
 	case vips.KindEnum, vips.KindFlags:
-		return "Int", p.goType
+		return "Int", p.goType, true
 	case vips.KindImage:
-		return "Image", ""
+		return "Image", "", true
 	case vips.KindArrayInt:
-		return "Ints", ""
+		return "Ints", "", true
 	case vips.KindArrayDouble:
-		return "Floats", ""
+		return "Floats", "", true
 	case vips.KindArrayImage:
-		return "Images", ""
+		return "Images", "", true
 	case vips.KindBlob:
-		return "Bytes", ""
+		return "Bytes", "", true
 	}
-	return "Image", ""
+	return "", "", false
 }
 
 func zeroValue(goType string) string {
@@ -478,6 +580,17 @@ func formatDefault(a vips.ArgSpec) string {
 		}
 		return fmt.Sprintf("%q", d)
 	case bool:
+		return fmt.Sprint(d)
+	case int:
+		// A bare number is the one rendering nobody can read: say the nick the
+		// type's own String method would say, with the number alongside.
+		if a.Kind == vips.KindEnum || a.Kind == vips.KindFlags {
+			for _, v := range vips.EnumValues(a.TypeName) {
+				if v.Value == d {
+					return fmt.Sprintf("%s (%d)", v.Nick, d)
+				}
+			}
+		}
 		return fmt.Sprint(d)
 	default:
 		return fmt.Sprint(d)
