@@ -39,6 +39,12 @@ func (e *ClosedError) Error() string {
 type Image struct {
 	ptr     atomic.Pointer[C.VipsImage]
 	cleanup runtime.Cleanup
+
+	// watch is the attached progress handler, if any. It lives here so Close
+	// can detach it first: disconnecting a signal from an object that has just
+	// been unreffed is a use-after-free, and the ordering should not be the
+	// caller's problem.
+	watch atomic.Pointer[Watch]
 }
 
 // wrapImage takes ownership of one reference to a VipsImage.
@@ -71,6 +77,9 @@ func (im *Image) Close() {
 	if im == nil {
 		return
 	}
+	// Detach before the object goes: the handler holds signal ids on it.
+	im.watch.Load().Stop()
+
 	// Swap is the claim: exactly one caller can take the pointer away, so it
 	// doubles as the once-only guard the separate flag used to provide.
 	p := im.ptr.Swap(nil)
