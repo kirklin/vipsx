@@ -136,19 +136,25 @@ func NewSourceFromBytes(data []byte) (*Source, error) {
 	return s, nil
 }
 
-// Close releases the source, and the reader behind it when there is one. Any
-// image loaded from the source must be evaluated or closed first; a demand for
-// bytes after this fails its operation.
+// Close releases the source, and the reader behind it when there is one.
+//
+// Any image loaded from the source must be evaluated or closed first: a demand
+// for bytes after this fails its operation, and Err then reports
+// ErrStreamClosed. CopyMemory is the way to close early — it takes the pixels,
+// after which the reader is no longer needed.
 func (s *Source) Close() {
 	s.close()
 	if s.st != nil {
-		unregisterStream(s.st.id)
+		s.st.release()
 	}
 }
 
-// Err reports the first error the underlying reader returned, if any. libvips
-// turns a failed read into an operation error of its own, which says that
-// reading failed but not why; this says why. It keeps answering after Close.
+// Err reports why reading failed, when it did.
+//
+// libvips turns a failed read into an operation error of its own, which says
+// that reading failed and nothing about the cause. This is the cause: whatever
+// the reader returned, or ErrStreamClosed if the source was closed while an
+// image still needed it. It keeps answering after Close.
 func (s *Source) Err() error {
 	if s.st == nil {
 		return nil
@@ -222,13 +228,20 @@ func (t *Target) Bytes() ([]byte, error) {
 func (t *Target) Close() {
 	t.close()
 	if t.st != nil {
-		unregisterStream(t.st.id)
+		t.st.release()
 	}
 }
 
-// Err reports the first error the underlying writer returned, if any. A save
-// through a failing writer fails as a libvips error, which reports that writing
-// failed but not why; this says why. It keeps answering after Close.
+// Err reports why writing failed, when it did.
+//
+// A save through a failing writer fails as a libvips error, which reports that
+// writing failed and nothing about the cause. This is the cause: whatever the
+// writer returned, or ErrStreamClosed if the target was closed while a save
+// still needed it. It keeps answering after Close.
+//
+// A target closed before a save even starts does not reach here: it is caught
+// by the argument check, which reports it directly. Sources are the ones that
+// can go away underneath an image, because an image is evaluated later.
 func (t *Target) Err() error {
 	if t.st == nil {
 		return nil
