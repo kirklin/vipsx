@@ -56,12 +56,27 @@ int vipsx_band_format_iscomplex(int format) {
   return vips_band_format_iscomplex((VipsBandFormat)format) ? 1 : 0;
 }
 
-double vipsx_interpretation_max_alpha(int interpretation) {
-  return vips_interpretation_max_alpha((VipsInterpretation)interpretation);
+// 8.15 and up. Reimplementing the table for older libvips would be exactly the
+// "a table that libvips will eventually disagree with" this function exists to
+// avoid, so say it is missing instead.
+int vipsx_interpretation_max_alpha(int interpretation, double *out) {
+#if VIPSX_AT_LEAST(8, 15)
+  *out = vips_interpretation_max_alpha((VipsInterpretation)interpretation);
+  return 1;
+#else
+  (void)interpretation;
+  *out = 0;
+  return 0;
+#endif
 }
 
 // Library limits and capabilities.
-int vipsx_max_coord_get(void) { return vips_max_coord_get(); }
+//
+// The macro rather than vips_max_coord_get, which only exists in newer libvips.
+// VIPS_MAX_COORD has always been there: an integer literal in older versions,
+// and a call to that function in the ones that have it. Either way it is the
+// right answer with no version guard to keep in step.
+int vipsx_max_coord_get(void) { return VIPS_MAX_COORD; }
 
 char **vipsx_foreign_get_suffixes(void) { return vips_foreign_get_suffixes(); }
 

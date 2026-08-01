@@ -115,8 +115,16 @@ func IsComplex(format int) bool { return C.vipsx_band_format_iscomplex(C.int(for
 //
 // Compositing with the wrong one silently produces a transparent image, which
 // is a slow thing to debug.
-func MaxAlpha(interpretation int) float64 {
-	return float64(C.vipsx_interpretation_max_alpha(C.int(interpretation)))
+//
+// Needs libvips 8.15. Writing the table out here for older versions would be
+// the thing this function exists to avoid — a copy that libvips eventually
+// disagrees with — so it reports what is missing instead.
+func MaxAlpha(interpretation int) (float64, error) {
+	var out C.double
+	if C.vipsx_interpretation_max_alpha(C.int(interpretation), &out) == 0 {
+		return 0, unsupported("interpretation_max_alpha", 8, 15)
+	}
+	return float64(out), nil
 }
 
 // ---------------------------------------------------------------------------
