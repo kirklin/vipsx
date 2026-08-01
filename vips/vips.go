@@ -21,12 +21,18 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
 
 var (
 	initOnce sync.Once
 	initErr  error
+
+	// shutdownDone is read by every collector cleanup. Shutdown frees the
+	// world libvips lives in, and the collector is free to run a cleanup
+	// afterwards; unreffing then is a use-after-free rather than tidiness.
+	shutdownDone atomic.Bool
 )
 
 func init() { Startup() }
@@ -50,7 +56,27 @@ func Startup() error {
 
 // Shutdown releases libvips resources. Calling any other function afterwards is
 // undefined; this exists for leak checking under valgrind and ASan.
-func Shutdown() { C.vipsx_shutdown() }
+//
+// Handles still alive at this point are not the caller's problem: the collector
+// may run their cleanups long after this returns, and those check the same flag
+// set here rather than unreffing into freed memory.
+func Shutdown() {
+	shutdownDone.Store(true)
+	C.vipsx_shutdown()
+}
+
+// goBytes copies a C buffer into Go memory.
+//
+// Not C.GoBytes, whose length is a C.int: a saved buffer can exceed 2 GB — a
+// large TIFF manages it — and the conversion would silently go negative.
+func goBytes(p unsafe.Pointer, n C.size_t) []byte {
+	if p == nil || n == 0 {
+		return nil
+	}
+	out := make([]byte, int(n))
+	copy(out, unsafe.Slice((*byte)(p), int(n)))
+	return out
+}
 
 // Version reports the libvips version this process is linked against. This is
 // the version actually loaded at runtime, not one baked in at build time.

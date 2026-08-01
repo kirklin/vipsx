@@ -14,49 +14,56 @@ import (
 
 // Format reports the numeric band format, matching VipsBandFormat.
 func (im *Image) Format() int {
+	p := im.live("Format")
 	defer runtime.KeepAlive(im)
-	return int(C.vipsx_image_format((*C.VipsImage)(im.ptr)))
+	return int(C.vipsx_image_format(p))
 }
 
 // Interpretation reports the colour interpretation, matching
 // VipsInterpretation.
 func (im *Image) Interpretation() int {
+	p := im.live("Interpretation")
 	defer runtime.KeepAlive(im)
-	return int(C.vipsx_image_interpretation((*C.VipsImage)(im.ptr)))
+	return int(C.vipsx_image_interpretation(p))
 }
 
 // Coding reports the pixel coding, matching VipsCoding.
 func (im *Image) Coding() int {
+	p := im.live("Coding")
 	defer runtime.KeepAlive(im)
-	return int(C.vipsx_image_coding((*C.VipsImage)(im.ptr)))
+	return int(C.vipsx_image_coding(p))
 }
 
 // Resolution reports pixels per millimetre horizontally and vertically.
 func (im *Image) Resolution() (x, y float64) {
+	p := im.live("Resolution")
 	defer runtime.KeepAlive(im)
-	return float64(C.vipsx_image_xres((*C.VipsImage)(im.ptr))),
-		float64(C.vipsx_image_yres((*C.VipsImage)(im.ptr)))
+	return float64(C.vipsx_image_xres(p)),
+		float64(C.vipsx_image_yres(p))
 }
 
 // Offset reports the image origin, which some operations set.
 func (im *Image) Offset() (x, y int) {
+	p := im.live("Offset")
 	defer runtime.KeepAlive(im)
-	return int(C.vipsx_image_xoffset((*C.VipsImage)(im.ptr))),
-		int(C.vipsx_image_yoffset((*C.VipsImage)(im.ptr)))
+	return int(C.vipsx_image_xoffset(p)),
+		int(C.vipsx_image_yoffset(p))
 }
 
 // HasAlpha reports whether the last band is an alpha channel.
 func (im *Image) HasAlpha() bool {
+	p := im.live("HasAlpha")
 	defer runtime.KeepAlive(im)
-	return C.vipsx_image_has_alpha((*C.VipsImage)(im.ptr)) != 0
+	return C.vipsx_image_has_alpha(p) != 0
 }
 
 // Fields lists the metadata field names carried on the image, including the
 // EXIF, XMP and ICC entries a loader attached.
 func (im *Image) Fields() []string {
+	p := im.live("Fields")
 	defer runtime.KeepAlive(im)
 	var count C.int
-	cfields := C.vipsx_image_fields((*C.VipsImage)(im.ptr), &count)
+	cfields := C.vipsx_image_fields(p, &count)
 	if cfields == nil {
 		return nil
 	}
@@ -71,29 +78,32 @@ func (im *Image) Fields() []string {
 
 // HasField reports whether a metadata field is present.
 func (im *Image) HasField(name string) bool {
+	p := im.live("HasField")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
-	return C.vipsx_image_has_field((*C.VipsImage)(im.ptr), cname) != 0
+	return C.vipsx_image_has_field(p, cname) != 0
 }
 
 // FieldKind reports how a metadata field is stored, using the same Kind values
 // as operation arguments.
 func (im *Image) FieldKind(name string) Kind {
+	p := im.live("FieldKind")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
-	return Kind(C.vipsx_image_get_kind((*C.VipsImage)(im.ptr), cname))
+	return Kind(C.vipsx_image_get_kind(p, cname))
 }
 
 // GetInt reads an integer metadata field.
 func (im *Image) GetInt(name string) (int, error) {
+	p := im.live("GetInt")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 
 	var out C.int
-	if C.vipsx_image_get_int((*C.VipsImage)(im.ptr), cname, &out) != 0 {
+	if C.vipsx_image_get_int(p, cname, &out) != 0 {
 		return 0, fieldErr(name)
 	}
 	return int(out), nil
@@ -101,12 +111,13 @@ func (im *Image) GetInt(name string) (int, error) {
 
 // GetDouble reads a floating point metadata field.
 func (im *Image) GetDouble(name string) (float64, error) {
+	p := im.live("GetDouble")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 
 	var out C.double
-	if C.vipsx_image_get_double((*C.VipsImage)(im.ptr), cname, &out) != 0 {
+	if C.vipsx_image_get_double(p, cname, &out) != 0 {
 		return 0, fieldErr(name)
 	}
 	return float64(out), nil
@@ -114,11 +125,12 @@ func (im *Image) GetDouble(name string) (float64, error) {
 
 // GetString reads a string metadata field.
 func (im *Image) GetString(name string) (string, error) {
+	p := im.live("GetString")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 
-	cstr := C.vipsx_image_get_string((*C.VipsImage)(im.ptr), cname)
+	cstr := C.vipsx_image_get_string(p, cname)
 	if cstr == nil {
 		return "", fieldErr(name)
 	}
@@ -129,11 +141,12 @@ func (im *Image) GetString(name string) (string, error) {
 // GetAsString renders any metadata field as text, whatever its stored type.
 // Useful for dumping EXIF without knowing each tag's type up front.
 func (im *Image) GetAsString(name string) (string, error) {
+	p := im.live("GetAsString")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 
-	cstr := C.vipsx_image_get_as_string((*C.VipsImage)(im.ptr), cname)
+	cstr := C.vipsx_image_get_as_string(p, cname)
 	if cstr == nil {
 		return "", fieldErr(name)
 	}
@@ -143,28 +156,30 @@ func (im *Image) GetAsString(name string) (string, error) {
 
 // GetBlob reads a binary metadata field, such as exif-data or icc-profile-data.
 func (im *Image) GetBlob(name string) ([]byte, error) {
+	p := im.live("GetBlob")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 
 	var length C.size_t
-	data := C.vipsx_image_get_blob((*C.VipsImage)(im.ptr), cname, &length)
+	data := C.vipsx_image_get_blob(p, cname, &length)
 	if data == nil {
 		return nil, fieldErr(name)
 	}
 	defer C.free(data)
-	return C.GoBytes(data, C.int(length)), nil
+	return goBytes(data, length), nil
 }
 
 // GetFloats reads an array-of-double metadata field.
 func (im *Image) GetFloats(name string) ([]float64, error) {
+	p := im.live("GetFloats")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 
 	var arr *C.double
 	var n C.int
-	if C.vipsx_image_get_array_double((*C.VipsImage)(im.ptr), cname, &arr, &n) != 0 {
+	if C.vipsx_image_get_array_double(p, cname, &arr, &n) != 0 {
 		return nil, fieldErr(name)
 	}
 	defer C.free(unsafe.Pointer(arr))
@@ -178,13 +193,14 @@ func (im *Image) GetFloats(name string) ([]float64, error) {
 
 // GetInts reads an array-of-int metadata field.
 func (im *Image) GetInts(name string) ([]int, error) {
+	p := im.live("GetInts")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 
 	var arr *C.int
 	var n C.int
-	if C.vipsx_image_get_array_int((*C.VipsImage)(im.ptr), cname, &arr, &n) != 0 {
+	if C.vipsx_image_get_array_int(p, cname, &arr, &n) != 0 {
 		return nil, fieldErr(name)
 	}
 	defer C.free(unsafe.Pointer(arr))
@@ -207,32 +223,36 @@ func (im *Image) GetInts(name string) ([]int, error) {
 //	own, err := vips.Copy(im, nil)
 //	own.SetString("comment", "mine")
 func (im *Image) SetInt(name string, value int) {
+	p := im.live("SetInt")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
-	C.vipsx_image_set_int((*C.VipsImage)(im.ptr), cname, C.int(value))
+	C.vipsx_image_set_int(p, cname, C.int(value))
 }
 
 // SetDouble writes a floating point metadata field.
 func (im *Image) SetDouble(name string, value float64) {
+	p := im.live("SetDouble")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
-	C.vipsx_image_set_double((*C.VipsImage)(im.ptr), cname, C.double(value))
+	C.vipsx_image_set_double(p, cname, C.double(value))
 }
 
 // SetString writes a string metadata field.
 func (im *Image) SetString(name, value string) {
+	p := im.live("SetString")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 	cvalue := C.CString(value)
 	defer C.free(unsafe.Pointer(cvalue))
-	C.vipsx_image_set_string((*C.VipsImage)(im.ptr), cname, cvalue)
+	C.vipsx_image_set_string(p, cname, cvalue)
 }
 
 // SetBlob writes a binary metadata field. The image takes its own copy.
 func (im *Image) SetBlob(name string, data []byte) {
+	cim := im.live("SetBlob")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
@@ -241,13 +261,14 @@ func (im *Image) SetBlob(name string, data []byte) {
 	if len(data) > 0 {
 		p = unsafe.Pointer(&data[0])
 	}
-	C.vipsx_image_set_blob((*C.VipsImage)(im.ptr), cname, p, C.size_t(len(data)))
+	C.vipsx_image_set_blob(cim, cname, p, C.size_t(len(data)))
 	runtime.KeepAlive(data)
 }
 
 // SetInts writes an array-of-int metadata field, such as the per-frame "delay"
 // of an animated image. libvips takes its own copy.
 func (im *Image) SetInts(name string, values []int) {
+	cim := im.live("SetInts")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
@@ -260,12 +281,13 @@ func (im *Image) SetInts(name string, values []int) {
 	if len(cvals) > 0 {
 		p = &cvals[0]
 	}
-	C.vipsx_image_set_array_int((*C.VipsImage)(im.ptr), cname, p, C.int(len(cvals)))
+	C.vipsx_image_set_array_int(cim, cname, p, C.int(len(cvals)))
 }
 
 // SetFloats writes an array-of-double metadata field. libvips takes its own
 // copy.
 func (im *Image) SetFloats(name string, values []float64) {
+	cim := im.live("SetFloats")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
@@ -278,15 +300,16 @@ func (im *Image) SetFloats(name string, values []float64) {
 	if len(cvals) > 0 {
 		p = &cvals[0]
 	}
-	C.vipsx_image_set_array_double((*C.VipsImage)(im.ptr), cname, p, C.int(len(cvals)))
+	C.vipsx_image_set_array_double(cim, cname, p, C.int(len(cvals)))
 }
 
 // RemoveField deletes a metadata field, reporting whether it was there.
 func (im *Image) RemoveField(name string) bool {
+	p := im.live("RemoveField")
 	defer runtime.KeepAlive(im)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
-	return C.vipsx_image_remove((*C.VipsImage)(im.ptr), cname) != 0
+	return C.vipsx_image_remove(p, cname) != 0
 }
 
 // Orientation reports the EXIF orientation tag, defaulting to 1 when absent.

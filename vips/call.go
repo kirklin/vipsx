@@ -236,8 +236,14 @@ func marshal(ar *arena, spec ArgSpec, v any, dst *C.VipsxArg, keep *[]any) error
 
 	case KindImage, KindSource, KindTarget, KindInterpolate, KindObject:
 		obj, ok := v.(cObject)
-		if !ok || obj == nil {
+		if !ok {
 			return typeErr(spec, v, spec.Kind.String()+" handle")
+		}
+		// A typed nil is not a nil interface: (*Image)(nil) satisfies cObject
+		// and passes obj == nil, so it has to be looked through here. It used
+		// to reach the method call below and panic on the nil receiver.
+		if obj == nil || isNilPointer(v) {
+			return fmt.Errorf("argument %q: handle is nil", spec.Name)
 		}
 		p := obj.cPointer()
 		if p == nil {
@@ -305,7 +311,7 @@ func unmarshal(out *C.VipsxOut) (any, error) {
 	case KindImage, KindSource, KindTarget, KindInterpolate, KindObject:
 		return wrapImage(out.p), nil
 	case KindBlob:
-		return C.GoBytes(out.arr, C.int(out.n)), nil
+		return goBytes(out.arr, out.n), nil
 	case KindArrayInt:
 		n := int(out.n)
 		src := unsafe.Slice((*C.int)(out.arr), n)
@@ -383,6 +389,12 @@ func enumMembers(typeName string) string {
 func typeErr(spec ArgSpec, got any, want string) error {
 	return fmt.Errorf("argument %q (%s) wants %s, got %T",
 		spec.Name, spec.TypeName, want, got)
+}
+
+// isNilPointer looks through an interface at a typed nil pointer.
+func isNilPointer(v any) bool {
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Pointer && rv.IsNil()
 }
 
 // ---------------------------------------------------------------------------
