@@ -531,16 +531,19 @@ What is done: the generic call path, the generated typed layer, metadata,
 deadlines and cancellation, the hardening switches, the differential oracle and
 the leak suite.
 
+The CI matrix does run, and is green: libvips 8.14 in a Debian 12 container,
+8.15 on ubuntu-24.04, 8.18 on macOS, plus regenerating the typed layer against
+the CI libvips, ASan, and the C leak check. "One binding, any version" is
+tested rather than asserted.
+
 What is left before anyone should ship it:
 
-- **The CI matrix run rather than written.** Three libvips versions, ASan and
-  Valgrind actually executed. Until that happens, "one binding, any version" is
-  a claim about a file in `.github/`.
-- **A stability promise.** This is v0, so the API can still move. v1 and a
-  statement about what v1 means is worth more to a prospective user than another
-  function.
+- **A stability promise.** This is v0, so the API can still move. v1, and a
+  statement about what v1 means, is worth more to a prospective user than
+  another function.
 - **Hours.** Somebody's real traffic, for long enough that the numbers mean
-  something, with `vips.Memory()` watched across it.
+  something, with `vips.Memory()` watched across it. This is the whole of the
+  gap against govips and vipsgen, and no amount of code closes it.
 
 Two limitations are properties of libvips rather than gaps here, and are
 documented above rather than listed as work: error messages cannot be attributed
