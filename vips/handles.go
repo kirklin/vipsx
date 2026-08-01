@@ -14,31 +14,56 @@ import (
 
 // handle is the shared body of the non-image GObjects an operation can take as
 // an argument. They follow the same rule as Image: one reference, dropped by
-// Close or by the collector.
+// Close or by the collector, and read atomically so a Close racing a use is a
+// defined *ClosedError rather than a read of freed memory.
 type handle struct {
-	ptr     unsafe.Pointer
+	ptr     atomic.Pointer[C.GObject]
 	cleanup runtime.Cleanup
-	closed  atomic.Bool
 }
 
 func (h *handle) init(p unsafe.Pointer) {
-	h.ptr = p
-	h.cleanup = runtime.AddCleanup(h, func(ptr unsafe.Pointer) {
-		C.vipsx_object_unref(ptr)
-	}, p)
+	cp := (*C.GObject)(p)
+	h.ptr.Store(cp)
+	h.cleanup = runtime.AddCleanup(h, func(ptr *C.GObject) {
+		if shutdownDone.Load() {
+			return
+		}
+		C.vipsx_object_unref(unsafe.Pointer(ptr))
+	}, cp)
 }
 
 func (h *handle) close() {
-	if h == nil || !h.closed.CompareAndSwap(false, true) {
+	if h == nil {
+		return
+	}
+	p := h.ptr.Swap(nil)
+	if p == nil {
 		return
 	}
 	h.cleanup.Stop()
-	C.vipsx_object_unref(h.ptr)
-	h.ptr = nil
+	C.vipsx_object_unref(unsafe.Pointer(p))
 	runtime.KeepAlive(h)
 }
 
-func (h *handle) cPointer() unsafe.Pointer { return h.ptr }
+// live returns the wrapped object, or panics if the handle is closed. See
+// (*Image).live for why this is a panic and not a NULL passed along.
+func (h *handle) live(op string) unsafe.Pointer {
+	if h == nil {
+		panic(&ClosedError{Op: op})
+	}
+	p := h.ptr.Load()
+	if p == nil {
+		panic(&ClosedError{Op: op})
+	}
+	return unsafe.Pointer(p)
+}
+
+func (h *handle) cPointer() unsafe.Pointer {
+	if h == nil {
+		return nil
+	}
+	return unsafe.Pointer(h.ptr.Load())
+}
 
 // Interpolate is a resampling method, taken by operations such as affine and
 // mapim. Names come from libvips: "nearest", "bilinear", "bicubic", "lbb",
@@ -173,20 +198,24 @@ func NewTargetToMemory() (*Target, error) {
 	return t, nil
 }
 
-// Bytes takes the accumulated bytes from a memory target. It can only be called
-// once, and only on a target made by NewTargetToMemory.
+// Bytes copies out what a memory target has accumulated so far. It only works
+// on a target made by NewTargetToMemory.
+//
+// The bytes are copied rather than stolen, so calling this twice returns the
+// same content twice rather than nothing the second time.
 func (t *Target) Bytes() ([]byte, error) {
+	p := t.live("Target.Bytes")
 	defer runtime.KeepAlive(t)
 	if !t.memory {
 		return nil, &Error{Op: "target", Message: "not a memory target"}
 	}
 	var length C.size_t
-	p := C.vipsx_target_steal((*C.VipsTarget)(t.ptr), &length)
-	if p == nil {
+	buf := C.vipsx_target_steal((*C.VipsTarget)(p), &length)
+	if buf == nil {
 		return nil, &Error{Op: "target", Message: "nothing written"}
 	}
-	defer C.vipsx_gfree(p)
-	return C.GoBytes(p, C.int(length)), nil
+	defer C.vipsx_gfree(buf)
+	return goBytes(buf, length), nil
 }
 
 // Close releases the target, and the writer behind it when there is one.
