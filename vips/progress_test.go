@@ -135,13 +135,13 @@ func TestCancelOnAlreadyCancelledContext(t *testing.T) {
 	}
 }
 
-// Asking must not disarm: vips_image_iskilled consumes the flag it reports,
-// and an unshimmed Killed() once did too — Kill, Killed, Killed read true then
-// false with the kill silently gone.
-func TestKilledIsNotADestructiveRead(t *testing.T) {
-	// A private image, and the cache dropped afterwards: the armed kill flag
-	// stays on the underlying object, which identical cached calls share, and
-	// leaving it up would fail the next test to evaluate the same black.
+// Reading the kill flag clears it. That is libvips' behaviour, not this
+// package's, and the binding reports it rather than papering over it — this
+// test is here to pin the semantics so nobody re-adds a wrapper that hides
+// them, and to fail loudly if libvips ever changes its mind.
+func TestKilledIsADestructiveRead(t *testing.T) {
+	// A private image, and the cache dropped afterwards: the kill flag lives
+	// on the underlying object, which identical cached calls share.
 	vips.ClearCache()
 	t.Cleanup(vips.ClearCache)
 
@@ -152,8 +152,9 @@ func TestKilledIsNotADestructiveRead(t *testing.T) {
 	if !im.Killed() {
 		t.Fatal("Killed() is false right after Kill()")
 	}
-	if !im.Killed() {
-		t.Fatal("the first Killed() consumed the kill flag")
+	if im.Killed() {
+		t.Fatal("the kill flag survived being read; libvips used to consume it, " +
+			"and the doc on Killed says so")
 	}
 }
 
