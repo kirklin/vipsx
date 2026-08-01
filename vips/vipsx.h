@@ -266,4 +266,11 @@ void vipsx_unwatch_eval(VipsImage *image, gulong eval_id, gulong posteval_id);
 void vipsx_image_set_kill(VipsImage *image, int kill);
 int vipsx_image_iskilled(VipsImage *image);
 
+// Raw pixels, and materialising a pipeline into memory.
+VipsImage *vipsx_image_new_from_memory(const void *data, size_t size, int width,
+                                       int height, int bands, int format);
+void *vipsx_image_write_to_memory(VipsImage *image, size_t *size);
+VipsImage *vipsx_image_copy_memory(VipsImage *image);
+guint64 vipsx_format_sizeof(int format);
+
 #endif
