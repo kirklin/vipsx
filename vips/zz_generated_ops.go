@@ -177,7 +177,7 @@ func Lab2LabS(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Lab2XYZOptions struct {
-	// Temp Color temperature.
+	// Temp: Color temperature.
 	Temp *[]float64
 }
 
@@ -381,7 +381,7 @@ func XYZ2CMYK(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type XYZ2LabOptions struct {
-	// Temp Colour temperature.
+	// Temp: Colour temperature.
 	Temp *[]float64
 }
 
@@ -550,29 +550,29 @@ func Addalpha(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type AffineOptions struct {
-	// Interpolate Interpolate pixels with this.
-	Interpolate **Interpolate
-	// Oarea Area of output to generate.
+	// Interpolate: Interpolate pixels with this.
+	Interpolate *Interpolate
+	// Oarea: Area of output to generate.
 	Oarea *[]int
-	// Odx Horizontal output displacement.
+	// Odx: Horizontal output displacement.
 	// libvips default: 0
 	Odx *float64
-	// Ody Vertical output displacement.
+	// Ody: Vertical output displacement.
 	// libvips default: 0
 	Ody *float64
-	// Idx Horizontal input displacement.
+	// Idx: Horizontal input displacement.
 	// libvips default: 0
 	Idx *float64
-	// Idy Vertical input displacement.
+	// Idy: Vertical input displacement.
 	// libvips default: 0
 	Idy *float64
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// Premultiplied Images have premultiplied alpha.
+	// Premultiplied: Images have premultiplied alpha.
 	// libvips default: false
 	Premultiplied *bool
-	// Extend How to generate the extra pixels.
-	// libvips default: 5
+	// Extend: How to generate the extra pixels.
+	// libvips default: background (5)
 	Extend *Extend
 }
 
@@ -587,7 +587,7 @@ func Affine(in *Image, matrix []float64, options *AffineOptions) (*Image, error)
 	args = append(args, In("matrix", matrix))
 	if options != nil {
 		if options.Interpolate != nil {
-			args = append(args, In("interpolate", *options.Interpolate))
+			args = append(args, In("interpolate", options.Interpolate))
 		}
 		if options.Oarea != nil {
 			args = append(args, In("oarea", *options.Oarea))
@@ -631,26 +631,32 @@ func Affine(in *Image, matrix []float64, options *AffineOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type AnalyzeloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Analyzeload runs the libvips "analyzeload" operation: load an Analyze6 image.
 //
 // filename: Filename to load from.
 func Analyzeload(filename string, options *AnalyzeloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -665,6 +671,9 @@ func Analyzeload(filename string, options *AnalyzeloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("analyzeload", args...)
 	if err != nil {
@@ -676,6 +685,13 @@ func Analyzeload(filename string, options *AnalyzeloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -684,24 +700,24 @@ func Analyzeload(filename string, options *AnalyzeloadOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ArrayjoinOptions struct {
-	// Across Number of images across grid.
+	// Across: Number of images across grid.
 	// libvips default: 1
 	Across *int
-	// Shim Pixels between images.
+	// Shim: Pixels between images.
 	// libvips default: 0
 	Shim *int
-	// Background Colour for new pixels.
+	// Background: Colour for new pixels.
 	Background *[]float64
-	// Halign Align on the left, centre or right.
-	// libvips default: 0
+	// Halign: Align on the left, centre or right.
+	// libvips default: low (0)
 	Halign *Align
-	// Valign Align on the top, centre or bottom.
-	// libvips default: 0
+	// Valign: Align on the top, centre or bottom.
+	// libvips default: low (0)
 	Valign *Align
-	// Hspacing Horizontal spacing between images.
+	// Hspacing: Horizontal spacing between images.
 	// libvips default: 1
 	Hspacing *int
-	// Vspacing Vertical spacing between images.
+	// Vspacing: Vertical spacing between images.
 	// libvips default: 1
 	Vspacing *int
 }
@@ -748,12 +764,35 @@ func Arrayjoin(in []*Image, options *ArrayjoinOptions) (*Image, error) {
 	return r0, nil
 }
 
+// AutorotOptions holds the optional arguments of autorot.
+//
+// A nil field is not sent, so libvips applies its own default. A non-nil
+// field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
+type AutorotOptions struct {
+	// Angle: output — Angle image was rotated by.
+	Angle *Angle
+	// Flip: output — Whether the image was flipped or not.
+	Flip *bool
+}
+
 // Autorot runs the libvips "autorot" operation: autorotate image by exif tag.
 //
 // in: Input image.
-func Autorot(in *Image) (*Image, error) {
-	args := make([]Arg, 0, 1)
+func Autorot(in *Image, options *AutorotOptions) (*Image, error) {
+	args := make([]Arg, 0, 3)
 	args = append(args, In("in", in))
+	if options != nil {
+		if options.Angle != nil {
+			args = append(args, Out("angle"))
+		}
+		if options.Flip != nil {
+			args = append(args, Out("flip"))
+		}
+	}
 	outs, err := Call("autorot", args...)
 	if err != nil {
 		return nil, err
@@ -764,6 +803,18 @@ func Autorot(in *Image) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Angle != nil {
+			if v, err := outs.Int("angle"); err == nil {
+				*options.Angle = Angle(v)
+			}
+		}
+		if options.Flip != nil {
+			if v, err := outs.Bool("flip"); err == nil {
+				*options.Flip = v
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -813,7 +864,7 @@ func Bandbool(in *Image, boolean OperationBoolean) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type BandfoldOptions struct {
-	// Factor Fold by this factor.
+	// Factor: Fold by this factor.
 	// libvips default: 0
 	Factor *int
 }
@@ -907,7 +958,7 @@ func Bandmean(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type BandrankOptions struct {
-	// Index Select this band element from sorted list.
+	// Index: Select this band element from sorted list.
 	// libvips default: -1
 	Index *int
 }
@@ -941,7 +992,7 @@ func Bandrank(in []*Image, options *BandrankOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type BandunfoldOptions struct {
-	// Factor Unfold by this factor.
+	// Factor: Unfold by this factor.
 	// libvips default: 0
 	Factor *int
 }
@@ -975,7 +1026,7 @@ func Bandunfold(in *Image, options *BandunfoldOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type BlackOptions struct {
-	// Bands Number of bands in image.
+	// Bands: Number of bands in image.
 	// libvips default: 1
 	Bands *int
 }
@@ -1100,11 +1151,11 @@ func Byteswap(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type CannyOptions struct {
-	// Sigma Sigma of Gaussian.
+	// Sigma: Sigma of Gaussian.
 	// libvips default: 1.4
 	Sigma *float64
-	// Precision Convolve with this precision.
-	// libvips default: 1
+	// Precision: Convolve with this precision.
+	// libvips default: float (1)
 	Precision *Precision
 }
 
@@ -1162,7 +1213,7 @@ func Case(index *Image, cases []*Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type CastOptions struct {
-	// Shift Shift integer values up and down.
+	// Shift: Shift integer values up and down.
 	// libvips default: false
 	Shift *bool
 }
@@ -1199,10 +1250,10 @@ func Cast(in *Image, format BandFormat, options *CastOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ClampOptions struct {
-	// Min Minimum value.
+	// Min: Minimum value.
 	// libvips default: 0
 	Min *float64
-	// Max Maximum value.
+	// Max: Maximum value.
 	// libvips default: 1
 	Max *float64
 }
@@ -1239,8 +1290,8 @@ func Clamp(in *Image, options *ClampOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ColourspaceOptions struct {
-	// SourceSpace Source color space.
-	// libvips default: 22
+	// SourceSpace: Source color space.
+	// libvips default: srgb (22)
 	SourceSpace *Interpretation
 }
 
@@ -1276,22 +1327,22 @@ func Colourspace(in *Image, space Interpretation, options *ColourspaceOptions) (
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type CompassOptions struct {
-	// Times Rotate and convolve this many times.
+	// Times: Rotate and convolve this many times.
 	// libvips default: 2
 	Times *int
-	// Angle Rotate mask by this much between convolutions.
-	// libvips default: 2
+	// Angle: Rotate mask by this much between convolutions.
+	// libvips default: d90 (2)
 	Angle *Angle45
-	// Combine Combine convolution results like this.
-	// libvips default: 0
+	// Combine: Combine convolution results like this.
+	// libvips default: max (0)
 	Combine *Combine
-	// Precision Convolve with this precision.
-	// libvips default: 1
+	// Precision: Convolve with this precision.
+	// libvips default: float (1)
 	Precision *Precision
-	// Layers Use this many layers in approximation.
+	// Layers: Use this many layers in approximation.
 	// libvips default: 5
 	Layers *int
-	// Cluster Cluster lines closer than this in approximation.
+	// Cluster: Cluster lines closer than this in approximation.
 	// libvips default: 1
 	Cluster *int
 }
@@ -1434,14 +1485,14 @@ func Complexget(in *Image, get OperationComplexget) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type CompositeOptions struct {
-	// X Array of x coordinates to join at.
+	// X: Array of x coordinates to join at.
 	X *[]int
-	// Y Array of y coordinates to join at.
+	// Y: Array of y coordinates to join at.
 	Y *[]int
-	// CompositingSpace Composite images in this colour space.
-	// libvips default: 22
+	// CompositingSpace: Composite images in this colour space.
+	// libvips default: srgb (22)
 	CompositingSpace *Interpretation
-	// Premultiplied Images have premultiplied alpha.
+	// Premultiplied: Images have premultiplied alpha.
 	// libvips default: false
 	Premultiplied *bool
 }
@@ -1487,16 +1538,16 @@ func Composite(in []*Image, mode []int, options *CompositeOptions) (*Image, erro
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Composite2Options struct {
-	// X x position of overlay.
+	// X: x position of overlay.
 	// libvips default: 0
 	X *int
-	// Y y position of overlay.
+	// Y: y position of overlay.
 	// libvips default: 0
 	Y *int
-	// CompositingSpace Composite images in this colour space.
-	// libvips default: 22
+	// CompositingSpace: Composite images in this colour space.
+	// libvips default: srgb (22)
 	CompositingSpace *Interpretation
-	// Premultiplied Images have premultiplied alpha.
+	// Premultiplied: Images have premultiplied alpha.
 	// libvips default: false
 	Premultiplied *bool
 }
@@ -1545,13 +1596,13 @@ func Composite2(base *Image, overlay *Image, mode BlendMode, options *Composite2
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ConvOptions struct {
-	// Precision Convolve with this precision.
-	// libvips default: 1
+	// Precision: Convolve with this precision.
+	// libvips default: float (1)
 	Precision *Precision
-	// Layers Use this many layers in approximation.
+	// Layers: Use this many layers in approximation.
 	// libvips default: 5
 	Layers *int
-	// Cluster Cluster lines closer than this in approximation.
+	// Cluster: Cluster lines closer than this in approximation.
 	// libvips default: 1
 	Cluster *int
 }
@@ -1594,10 +1645,10 @@ func Conv(in *Image, mask *Image, options *ConvOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ConvaOptions struct {
-	// Layers Use this many layers in approximation.
+	// Layers: Use this many layers in approximation.
 	// libvips default: 5
 	Layers *int
-	// Cluster Cluster lines closer than this in approximation.
+	// Cluster: Cluster lines closer than this in approximation.
 	// libvips default: 1
 	Cluster *int
 }
@@ -1637,7 +1688,7 @@ func Conva(in *Image, mask *Image, options *ConvaOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ConvasepOptions struct {
-	// Layers Use this many layers in approximation.
+	// Layers: Use this many layers in approximation.
 	// libvips default: 5
 	Layers *int
 }
@@ -1718,13 +1769,13 @@ func Convi(in *Image, mask *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ConvsepOptions struct {
-	// Precision Convolve with this precision.
-	// libvips default: 1
+	// Precision: Convolve with this precision.
+	// libvips default: float (1)
 	Precision *Precision
-	// Layers Use this many layers in approximation.
+	// Layers: Use this many layers in approximation.
 	// libvips default: 5
 	Layers *int
-	// Cluster Cluster lines closer than this in approximation.
+	// Cluster: Cluster lines closer than this in approximation.
 	// libvips default: 1
 	Cluster *int
 }
@@ -1767,34 +1818,34 @@ func Convsep(in *Image, mask *Image, options *ConvsepOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type CopyOptions struct {
-	// Width Image width in pixels.
+	// Width: Image width in pixels.
 	// libvips default: 0
 	Width *int
-	// Height Image height in pixels.
+	// Height: Image height in pixels.
 	// libvips default: 0
 	Height *int
-	// Bands Number of bands in image.
+	// Bands: Number of bands in image.
 	// libvips default: 0
 	Bands *int
-	// Format Pixel format in image.
-	// libvips default: 0
+	// Format: Pixel format in image.
+	// libvips default: uchar (0)
 	Format *BandFormat
-	// Coding Pixel coding.
-	// libvips default: 0
+	// Coding: Pixel coding.
+	// libvips default: none (0)
 	Coding *Coding
-	// Interpretation Pixel interpretation.
-	// libvips default: 0
+	// Interpretation: Pixel interpretation.
+	// libvips default: multiband (0)
 	Interpretation *Interpretation
-	// Xres Horizontal resolution in pixels/mm.
+	// Xres: Horizontal resolution in pixels/mm.
 	// libvips default: 0
 	Xres *float64
-	// Yres Vertical resolution in pixels/mm.
+	// Yres: Vertical resolution in pixels/mm.
 	// libvips default: 0
 	Yres *float64
-	// Xoffset Horizontal offset of origin.
+	// Xoffset: Horizontal offset of origin.
 	// libvips default: 0
 	Xoffset *int
-	// Yoffset Vertical offset of origin.
+	// Yoffset: Vertical offset of origin.
 	// libvips default: 0
 	Yoffset *int
 }
@@ -1876,38 +1927,44 @@ func Countlines(in *Image, direction Direction) (float64, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type CsvloadOptions struct {
-	// Skip Skip this many lines at the start of the file.
+	// Skip: Skip this many lines at the start of the file.
 	// libvips default: 0
 	Skip *int
-	// Lines Read this many lines from the file.
+	// Lines: Read this many lines from the file.
 	// libvips default: -1
 	Lines *int
-	// Whitespace Set of whitespace characters.
+	// Whitespace: Set of whitespace characters.
 	// libvips default: " "
 	Whitespace *string
-	// Separator Set of separator characters.
+	// Separator: Set of separator characters.
 	// libvips default: ";,\t"
 	Separator *string
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Csvload runs the libvips "csvload" operation: load csv.
 //
 // filename: Filename to load from.
 func Csvload(filename string, options *CsvloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 9)
+	args := make([]Arg, 0, 10)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Skip != nil {
@@ -1934,6 +1991,9 @@ func Csvload(filename string, options *CsvloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("csvload", args...)
 	if err != nil {
@@ -1945,6 +2005,13 @@ func Csvload(filename string, options *CsvloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -1952,38 +2019,44 @@ func Csvload(filename string, options *CsvloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type CsvloadSourceOptions struct {
-	// Skip Skip this many lines at the start of the file.
+	// Skip: Skip this many lines at the start of the file.
 	// libvips default: 0
 	Skip *int
-	// Lines Read this many lines from the file.
+	// Lines: Read this many lines from the file.
 	// libvips default: -1
 	Lines *int
-	// Whitespace Set of whitespace characters.
+	// Whitespace: Set of whitespace characters.
 	// libvips default: " "
 	Whitespace *string
-	// Separator Set of separator characters.
+	// Separator: Set of separator characters.
 	// libvips default: ";,\t"
 	Separator *string
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // CsvloadSource runs the libvips "csvload_source" operation: load csv.
 //
 // source: Source to load from.
 func CsvloadSource(source *Source, options *CsvloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 9)
+	args := make([]Arg, 0, 10)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Skip != nil {
@@ -2010,6 +2083,9 @@ func CsvloadSource(source *Source, options *CsvloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("csvload_source", args...)
 	if err != nil {
@@ -2021,6 +2097,13 @@ func CsvloadSource(source *Source, options *CsvloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -2029,18 +2112,18 @@ func CsvloadSource(source *Source, options *CsvloadSourceOptions) (*Image, error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type CsvsaveOptions struct {
-	// Separator Separator characters.
+	// Separator: Separator characters.
 	// libvips default: "\t"
 	Separator *string
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -2083,18 +2166,18 @@ func Csvsave(in *Image, filename string, options *CsvsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type CsvsaveTargetOptions struct {
-	// Separator Separator characters.
+	// Separator: Separator characters.
 	// libvips default: "\t"
 	Separator *string
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -2202,29 +2285,35 @@ func DECMC(left *Image, right *Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type DcrawloadOptions struct {
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 8
 	Bitdepth *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Dcrawload runs the libvips "dcrawload" operation: load RAW camera files.
 //
 // filename: Filename to load from.
 func Dcrawload(filename string, options *DcrawloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Bitdepth != nil {
@@ -2242,6 +2331,9 @@ func Dcrawload(filename string, options *DcrawloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("dcrawload", args...)
 	if err != nil {
@@ -2253,6 +2345,13 @@ func Dcrawload(filename string, options *DcrawloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -2260,29 +2359,35 @@ func Dcrawload(filename string, options *DcrawloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type DcrawloadBufferOptions struct {
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 8
 	Bitdepth *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // DcrawloadBuffer runs the libvips "dcrawload_buffer" operation: load RAW camera files.
 //
 // buffer: Buffer to load from.
 func DcrawloadBuffer(buffer []byte, options *DcrawloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Bitdepth != nil {
@@ -2300,6 +2405,9 @@ func DcrawloadBuffer(buffer []byte, options *DcrawloadBufferOptions) (*Image, er
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("dcrawload_buffer", args...)
 	if err != nil {
@@ -2311,6 +2419,13 @@ func DcrawloadBuffer(buffer []byte, options *DcrawloadBufferOptions) (*Image, er
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -2318,29 +2433,35 @@ func DcrawloadBuffer(buffer []byte, options *DcrawloadBufferOptions) (*Image, er
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type DcrawloadSourceOptions struct {
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 8
 	Bitdepth *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // DcrawloadSource runs the libvips "dcrawload_source" operation: load RAW camera files.
 //
 // source: Source to load from.
 func DcrawloadSource(source *Source, options *DcrawloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Bitdepth != nil {
@@ -2358,6 +2479,9 @@ func DcrawloadSource(source *Source, options *DcrawloadSourceOptions) (*Image, e
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("dcrawload_source", args...)
 	if err != nil {
@@ -2369,6 +2493,13 @@ func DcrawloadSource(source *Source, options *DcrawloadSourceOptions) (*Image, e
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -2418,7 +2549,7 @@ func Divide(left *Image, right *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type DrawCircleOptions struct {
-	// Fill Draw a solid object.
+	// Fill: Draw a solid object.
 	// libvips default: false
 	Fill *bool
 }
@@ -2434,7 +2565,12 @@ type DrawCircleOptions struct {
 // cy: Centre of draw_circle.
 //
 // radius: Radius in pixels.
-func DrawCircle(image *Image, ink []float64, cx int, cy int, radius int, options *DrawCircleOptions) error {
+//
+// In libvips this operation modifies an image in place. This binding never
+// hands it yours: Call substitutes a private copy — the image passed in may
+// be shared with other holders through the operation cache — libvips draws
+// on that copy, and the copy is what comes back. The argument is untouched.
+func DrawCircle(image *Image, ink []float64, cx int, cy int, radius int, options *DrawCircleOptions) (*Image, error) {
 	args := make([]Arg, 0, 6)
 	args = append(args, In("image", image))
 	args = append(args, In("ink", ink))
@@ -2448,22 +2584,39 @@ func DrawCircle(image *Image, ink []float64, cx int, cy int, radius int, options
 	}
 	outs, err := Call("draw_circle", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	outs.Close()
-	return nil
+	v0, err := outs.Image("image")
+	if err != nil {
+		outs.Close()
+		return nil, err
+	}
+	r0 := v0
+	return r0, nil
 }
 
 // DrawFloodOptions holds the optional arguments of draw_flood.
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type DrawFloodOptions struct {
-	// Test Test pixels in this image.
-	Test **Image
-	// Equal DrawFlood while equal to edge.
+	// Test: Test pixels in this image.
+	Test *Image
+	// Equal: DrawFlood while equal to edge.
 	// libvips default: false
 	Equal *bool
+	// Left: output — Left edge of modified area.
+	Left *int
+	// Top: output — Top edge of modified area.
+	Top *int
+	// Width: output — Width of modified area.
+	Width *int
+	// Height: output — Height of modified area.
+	Height *int
 }
 
 // DrawFlood runs the libvips "draw_flood" operation: flood-fill an area.
@@ -2475,26 +2628,70 @@ type DrawFloodOptions struct {
 // x: DrawFlood start point.
 //
 // y: DrawFlood start point.
-func DrawFlood(image *Image, ink []float64, x int, y int, options *DrawFloodOptions) error {
-	args := make([]Arg, 0, 6)
+//
+// In libvips this operation modifies an image in place. This binding never
+// hands it yours: Call substitutes a private copy — the image passed in may
+// be shared with other holders through the operation cache — libvips draws
+// on that copy, and the copy is what comes back. The argument is untouched.
+func DrawFlood(image *Image, ink []float64, x int, y int, options *DrawFloodOptions) (*Image, error) {
+	args := make([]Arg, 0, 10)
 	args = append(args, In("image", image))
 	args = append(args, In("ink", ink))
 	args = append(args, In("x", x))
 	args = append(args, In("y", y))
 	if options != nil {
 		if options.Test != nil {
-			args = append(args, In("test", *options.Test))
+			args = append(args, In("test", options.Test))
 		}
 		if options.Equal != nil {
 			args = append(args, In("equal", *options.Equal))
 		}
+		if options.Left != nil {
+			args = append(args, Out("left"))
+		}
+		if options.Top != nil {
+			args = append(args, Out("top"))
+		}
+		if options.Width != nil {
+			args = append(args, Out("width"))
+		}
+		if options.Height != nil {
+			args = append(args, Out("height"))
+		}
 	}
 	outs, err := Call("draw_flood", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	outs.Close()
-	return nil
+	v0, err := outs.Image("image")
+	if err != nil {
+		outs.Close()
+		return nil, err
+	}
+	r0 := v0
+	if options != nil {
+		if options.Left != nil {
+			if v, err := outs.Int("left"); err == nil {
+				*options.Left = v
+			}
+		}
+		if options.Top != nil {
+			if v, err := outs.Int("top"); err == nil {
+				*options.Top = v
+			}
+		}
+		if options.Width != nil {
+			if v, err := outs.Int("width"); err == nil {
+				*options.Width = v
+			}
+		}
+		if options.Height != nil {
+			if v, err := outs.Int("height"); err == nil {
+				*options.Height = v
+			}
+		}
+	}
+	return r0, nil
 }
 
 // DrawImageOptions holds the optional arguments of draw_image.
@@ -2502,8 +2699,8 @@ func DrawFlood(image *Image, ink []float64, x int, y int, options *DrawFloodOpti
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type DrawImageOptions struct {
-	// Mode Combining mode.
-	// libvips default: 0
+	// Mode: Combining mode.
+	// libvips default: set (0)
 	Mode *CombineMode
 }
 
@@ -2516,7 +2713,12 @@ type DrawImageOptions struct {
 // x: Draw image here.
 //
 // y: Draw image here.
-func DrawImage(image *Image, sub *Image, x int, y int, options *DrawImageOptions) error {
+//
+// In libvips this operation modifies an image in place. This binding never
+// hands it yours: Call substitutes a private copy — the image passed in may
+// be shared with other holders through the operation cache — libvips draws
+// on that copy, and the copy is what comes back. The argument is untouched.
+func DrawImage(image *Image, sub *Image, x int, y int, options *DrawImageOptions) (*Image, error) {
 	args := make([]Arg, 0, 5)
 	args = append(args, In("image", image))
 	args = append(args, In("sub", sub))
@@ -2529,10 +2731,15 @@ func DrawImage(image *Image, sub *Image, x int, y int, options *DrawImageOptions
 	}
 	outs, err := Call("draw_image", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	outs.Close()
-	return nil
+	v0, err := outs.Image("image")
+	if err != nil {
+		outs.Close()
+		return nil, err
+	}
+	r0 := v0
+	return r0, nil
 }
 
 // DrawLine runs the libvips "draw_line" operation: draw a line on an image.
@@ -2548,7 +2755,12 @@ func DrawImage(image *Image, sub *Image, x int, y int, options *DrawImageOptions
 // x2: End of draw_line.
 //
 // y2: End of draw_line.
-func DrawLine(image *Image, ink []float64, x1 int, y1 int, x2 int, y2 int) error {
+//
+// In libvips this operation modifies an image in place. This binding never
+// hands it yours: Call substitutes a private copy — the image passed in may
+// be shared with other holders through the operation cache — libvips draws
+// on that copy, and the copy is what comes back. The argument is untouched.
+func DrawLine(image *Image, ink []float64, x1 int, y1 int, x2 int, y2 int) (*Image, error) {
 	args := make([]Arg, 0, 6)
 	args = append(args, In("image", image))
 	args = append(args, In("ink", ink))
@@ -2558,10 +2770,15 @@ func DrawLine(image *Image, ink []float64, x1 int, y1 int, x2 int, y2 int) error
 	args = append(args, In("y2", y2))
 	outs, err := Call("draw_line", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	outs.Close()
-	return nil
+	v0, err := outs.Image("image")
+	if err != nil {
+		outs.Close()
+		return nil, err
+	}
+	r0 := v0
+	return r0, nil
 }
 
 // DrawMask runs the libvips "draw_mask" operation: draw a mask on an image.
@@ -2575,7 +2792,12 @@ func DrawLine(image *Image, ink []float64, x1 int, y1 int, x2 int, y2 int) error
 // x: Draw mask here.
 //
 // y: Draw mask here.
-func DrawMask(image *Image, ink []float64, mask *Image, x int, y int) error {
+//
+// In libvips this operation modifies an image in place. This binding never
+// hands it yours: Call substitutes a private copy — the image passed in may
+// be shared with other holders through the operation cache — libvips draws
+// on that copy, and the copy is what comes back. The argument is untouched.
+func DrawMask(image *Image, ink []float64, mask *Image, x int, y int) (*Image, error) {
 	args := make([]Arg, 0, 5)
 	args = append(args, In("image", image))
 	args = append(args, In("ink", ink))
@@ -2584,10 +2806,15 @@ func DrawMask(image *Image, ink []float64, mask *Image, x int, y int) error {
 	args = append(args, In("y", y))
 	outs, err := Call("draw_mask", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	outs.Close()
-	return nil
+	v0, err := outs.Image("image")
+	if err != nil {
+		outs.Close()
+		return nil, err
+	}
+	r0 := v0
+	return r0, nil
 }
 
 // DrawRectOptions holds the optional arguments of draw_rect.
@@ -2595,7 +2822,7 @@ func DrawMask(image *Image, ink []float64, mask *Image, x int, y int) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type DrawRectOptions struct {
-	// Fill Draw a solid object.
+	// Fill: Draw a solid object.
 	// libvips default: false
 	Fill *bool
 }
@@ -2613,7 +2840,12 @@ type DrawRectOptions struct {
 // width: Rect to fill.
 //
 // height: Rect to fill.
-func DrawRect(image *Image, ink []float64, left int, top int, width int, height int, options *DrawRectOptions) error {
+//
+// In libvips this operation modifies an image in place. This binding never
+// hands it yours: Call substitutes a private copy — the image passed in may
+// be shared with other holders through the operation cache — libvips draws
+// on that copy, and the copy is what comes back. The argument is untouched.
+func DrawRect(image *Image, ink []float64, left int, top int, width int, height int, options *DrawRectOptions) (*Image, error) {
 	args := make([]Arg, 0, 7)
 	args = append(args, In("image", image))
 	args = append(args, In("ink", ink))
@@ -2628,10 +2860,15 @@ func DrawRect(image *Image, ink []float64, left int, top int, width int, height 
 	}
 	outs, err := Call("draw_rect", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	outs.Close()
-	return nil
+	v0, err := outs.Image("image")
+	if err != nil {
+		outs.Close()
+		return nil, err
+	}
+	r0 := v0
+	return r0, nil
 }
 
 // DrawSmudge runs the libvips "draw_smudge" operation: blur a rectangle on an image.
@@ -2645,7 +2882,12 @@ func DrawRect(image *Image, ink []float64, left int, top int, width int, height 
 // width: Rect to fill.
 //
 // height: Rect to fill.
-func DrawSmudge(image *Image, left int, top int, width int, height int) error {
+//
+// In libvips this operation modifies an image in place. This binding never
+// hands it yours: Call substitutes a private copy — the image passed in may
+// be shared with other holders through the operation cache — libvips draws
+// on that copy, and the copy is what comes back. The argument is untouched.
+func DrawSmudge(image *Image, left int, top int, width int, height int) (*Image, error) {
 	args := make([]Arg, 0, 5)
 	args = append(args, In("image", image))
 	args = append(args, In("left", left))
@@ -2654,10 +2896,15 @@ func DrawSmudge(image *Image, left int, top int, width int, height int) error {
 	args = append(args, In("height", height))
 	outs, err := Call("draw_smudge", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	outs.Close()
-	return nil
+	v0, err := outs.Image("image")
+	if err != nil {
+		outs.Close()
+		return nil, err
+	}
+	r0 := v0
+	return r0, nil
 }
 
 // DzsaveOptions holds the optional arguments of dzsave.
@@ -2665,56 +2912,56 @@ func DrawSmudge(image *Image, left int, top int, width int, height int) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type DzsaveOptions struct {
-	// Imagename Image name.
+	// Imagename: Image name.
 	Imagename *string
-	// Layout Directory layout.
-	// libvips default: 0
+	// Layout: Directory layout.
+	// libvips default: dz (0)
 	Layout *DzLayout
-	// Suffix Filename suffix for tiles.
+	// Suffix: Filename suffix for tiles.
 	// libvips default: ".jpeg"
 	Suffix *string
-	// Overlap Tile overlap in pixels.
+	// Overlap: Tile overlap in pixels.
 	// libvips default: 1
 	Overlap *int
-	// TileSize Tile size in pixels.
+	// TileSize: Tile size in pixels.
 	// libvips default: 254
 	TileSize *int
-	// Centre Center image in tile.
+	// Centre: Center image in tile.
 	// libvips default: false
 	Centre *bool
-	// Depth Pyramid depth.
-	// libvips default: 0
+	// Depth: Pyramid depth.
+	// libvips default: onepixel (0)
 	Depth *DzDepth
-	// Angle Rotate image during save.
-	// libvips default: 0
+	// Angle: Rotate image during save.
+	// libvips default: d0 (0)
 	Angle *Angle
-	// Container Pyramid container type.
-	// libvips default: 0
+	// Container: Pyramid container type.
+	// libvips default: fs (0)
 	Container *DzContainer
-	// Compression ZIP deflate compression level.
+	// Compression: ZIP deflate compression level.
 	// libvips default: 0
 	Compression *int
-	// RegionShrink Method to shrink regions.
-	// libvips default: 0
+	// RegionShrink: Method to shrink regions.
+	// libvips default: mean (0)
 	RegionShrink *RegionShrink
-	// SkipBlanks Skip tiles which are nearly equal to the background.
+	// SkipBlanks: Skip tiles which are nearly equal to the background.
 	// libvips default: -1
 	SkipBlanks *int
-	// Id Resource ID.
+	// Id: Resource ID.
 	// libvips default: "https://example.com/iiif"
 	Id *string
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -2796,56 +3043,56 @@ func Dzsave(in *Image, filename string, options *DzsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type DzsaveBufferOptions struct {
-	// Imagename Image name.
+	// Imagename: Image name.
 	Imagename *string
-	// Layout Directory layout.
-	// libvips default: 0
+	// Layout: Directory layout.
+	// libvips default: dz (0)
 	Layout *DzLayout
-	// Suffix Filename suffix for tiles.
+	// Suffix: Filename suffix for tiles.
 	// libvips default: ".jpeg"
 	Suffix *string
-	// Overlap Tile overlap in pixels.
+	// Overlap: Tile overlap in pixels.
 	// libvips default: 1
 	Overlap *int
-	// TileSize Tile size in pixels.
+	// TileSize: Tile size in pixels.
 	// libvips default: 254
 	TileSize *int
-	// Centre Center image in tile.
+	// Centre: Center image in tile.
 	// libvips default: false
 	Centre *bool
-	// Depth Pyramid depth.
-	// libvips default: 0
+	// Depth: Pyramid depth.
+	// libvips default: onepixel (0)
 	Depth *DzDepth
-	// Angle Rotate image during save.
-	// libvips default: 0
+	// Angle: Rotate image during save.
+	// libvips default: d0 (0)
 	Angle *Angle
-	// Container Pyramid container type.
-	// libvips default: 0
+	// Container: Pyramid container type.
+	// libvips default: fs (0)
 	Container *DzContainer
-	// Compression ZIP deflate compression level.
+	// Compression: ZIP deflate compression level.
 	// libvips default: 0
 	Compression *int
-	// RegionShrink Method to shrink regions.
-	// libvips default: 0
+	// RegionShrink: Method to shrink regions.
+	// libvips default: mean (0)
 	RegionShrink *RegionShrink
-	// SkipBlanks Skip tiles which are nearly equal to the background.
+	// SkipBlanks: Skip tiles which are nearly equal to the background.
 	// libvips default: -1
 	SkipBlanks *int
-	// Id Resource ID.
+	// Id: Resource ID.
 	// libvips default: "https://example.com/iiif"
 	Id *string
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -2929,56 +3176,56 @@ func DzsaveBuffer(in *Image, options *DzsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type DzsaveTargetOptions struct {
-	// Imagename Image name.
+	// Imagename: Image name.
 	Imagename *string
-	// Layout Directory layout.
-	// libvips default: 0
+	// Layout: Directory layout.
+	// libvips default: dz (0)
 	Layout *DzLayout
-	// Suffix Filename suffix for tiles.
+	// Suffix: Filename suffix for tiles.
 	// libvips default: ".jpeg"
 	Suffix *string
-	// Overlap Tile overlap in pixels.
+	// Overlap: Tile overlap in pixels.
 	// libvips default: 1
 	Overlap *int
-	// TileSize Tile size in pixels.
+	// TileSize: Tile size in pixels.
 	// libvips default: 254
 	TileSize *int
-	// Centre Center image in tile.
+	// Centre: Center image in tile.
 	// libvips default: false
 	Centre *bool
-	// Depth Pyramid depth.
-	// libvips default: 0
+	// Depth: Pyramid depth.
+	// libvips default: onepixel (0)
 	Depth *DzDepth
-	// Angle Rotate image during save.
-	// libvips default: 0
+	// Angle: Rotate image during save.
+	// libvips default: d0 (0)
 	Angle *Angle
-	// Container Pyramid container type.
-	// libvips default: 0
+	// Container: Pyramid container type.
+	// libvips default: fs (0)
 	Container *DzContainer
-	// Compression ZIP deflate compression level.
+	// Compression: ZIP deflate compression level.
 	// libvips default: 0
 	Compression *int
-	// RegionShrink Method to shrink regions.
-	// libvips default: 0
+	// RegionShrink: Method to shrink regions.
+	// libvips default: mean (0)
 	RegionShrink *RegionShrink
-	// SkipBlanks Skip tiles which are nearly equal to the background.
+	// SkipBlanks: Skip tiles which are nearly equal to the background.
 	// libvips default: -1
 	SkipBlanks *int
-	// Id Resource ID.
+	// Id: Resource ID.
 	// libvips default: "https://example.com/iiif"
 	Id *string
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -3060,10 +3307,10 @@ func DzsaveTarget(in *Image, target *Target, options *DzsaveTargetOptions) error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type EmbedOptions struct {
-	// Extend How to generate the extra pixels.
-	// libvips default: 0
+	// Extend: How to generate the extra pixels.
+	// libvips default: black (0)
 	Extend *Extend
-	// Background Color for background pixels.
+	// Background: Color for background pixels.
 	Background *[]float64
 }
 
@@ -3142,7 +3389,7 @@ func ExtractArea(input *Image, left int, top int, width int, height int) (*Image
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ExtractBandOptions struct {
-	// N Number of bands to extract.
+	// N: Number of bands to extract.
 	// libvips default: 1
 	N *int
 }
@@ -3179,10 +3426,10 @@ func ExtractBand(in *Image, band int, options *ExtractBandOptions) (*Image, erro
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type EyeOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Factor Maximum spatial frequency.
+	// Factor: Maximum spatial frequency.
 	// libvips default: 0.5
 	Factor *float64
 }
@@ -3258,12 +3505,30 @@ func Fastcor(in *Image, ref *Image) (*Image, error) {
 	return r0, nil
 }
 
+// FillNearestOptions holds the optional arguments of fill_nearest.
+//
+// A nil field is not sent, so libvips applies its own default. A non-nil
+// field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
+type FillNearestOptions struct {
+	// Distance: output — Distance to nearest non-zero pixel.
+	Distance **Image
+}
+
 // FillNearest runs the libvips "fill_nearest" operation: fill image zeros with nearest non-zero pixel.
 //
 // in: Input image argument.
-func FillNearest(in *Image) (*Image, error) {
-	args := make([]Arg, 0, 1)
+func FillNearest(in *Image, options *FillNearestOptions) (*Image, error) {
+	args := make([]Arg, 0, 2)
 	args = append(args, In("in", in))
+	if options != nil {
+		if options.Distance != nil {
+			args = append(args, Out("distance"))
+		}
+	}
 	outs, err := Call("fill_nearest", args...)
 	if err != nil {
 		return nil, err
@@ -3274,6 +3539,14 @@ func FillNearest(in *Image) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Distance != nil {
+			if v, err := outs.Image("distance"); err == nil {
+				*options.Distance = v
+				delete(outs, "distance")
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -3282,12 +3555,12 @@ func FillNearest(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type FindTrimOptions struct {
-	// Threshold Object threshold.
+	// Threshold: Object threshold.
 	// libvips default: 10
 	Threshold *float64
-	// Background Color for background pixels.
+	// Background: Color for background pixels.
 	Background *[]float64
-	// LineArt Enable line art mode.
+	// LineArt: Enable line art mode.
 	// libvips default: false
 	LineArt *bool
 }
@@ -3344,26 +3617,32 @@ func FindTrim(in *Image, options *FindTrimOptions) (int, int, int, int, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type FitsloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Fitsload runs the libvips "fitsload" operation: load a FITS image.
 //
 // filename: Filename to load from.
 func Fitsload(filename string, options *FitsloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -3378,6 +3657,9 @@ func Fitsload(filename string, options *FitsloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("fitsload", args...)
 	if err != nil {
@@ -3389,6 +3671,13 @@ func Fitsload(filename string, options *FitsloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -3396,26 +3685,32 @@ func Fitsload(filename string, options *FitsloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type FitsloadSourceOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // FitsloadSource runs the libvips "fitsload_source" operation: load FITS from a source.
 //
 // source: Source to load from.
 func FitsloadSource(source *Source, options *FitsloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Memory != nil {
@@ -3430,6 +3725,9 @@ func FitsloadSource(source *Source, options *FitsloadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("fitsload_source", args...)
 	if err != nil {
@@ -3441,6 +3739,13 @@ func FitsloadSource(source *Source, options *FitsloadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -3449,15 +3754,15 @@ func FitsloadSource(source *Source, options *FitsloadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type FitssaveOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -3497,9 +3802,9 @@ func Fitssave(in *Image, filename string, options *FitssaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type FlattenOptions struct {
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// MaxAlpha Maximum value of alpha channel.
+	// MaxAlpha: Maximum value of alpha channel.
 	// libvips default: 255
 	MaxAlpha *float64
 }
@@ -3643,7 +3948,7 @@ func Fwfft(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GammaOptions struct {
-	// Exponent Gamma factor.
+	// Exponent: Gamma factor.
 	// libvips default: 0.4166666666666667
 	Exponent *float64
 }
@@ -3677,11 +3982,11 @@ func Gamma(in *Image, options *GammaOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GaussblurOptions struct {
-	// MinAmpl Minimum amplitude of Gaussian.
+	// MinAmpl: Minimum amplitude of Gaussian.
 	// libvips default: 0.2
 	MinAmpl *float64
-	// Precision Convolve with this precision.
-	// libvips default: 0
+	// Precision: Convolve with this precision.
+	// libvips default: integer (0)
 	Precision *Precision
 }
 
@@ -3720,11 +4025,11 @@ func Gaussblur(in *Image, sigma float64, options *GaussblurOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GaussmatOptions struct {
-	// Separable Generate separable Gaussian.
+	// Separable: Generate separable Gaussian.
 	// libvips default: false
 	Separable *bool
-	// Precision Generate with this precision.
-	// libvips default: 0
+	// Precision: Generate with this precision.
+	// libvips default: integer (0)
 	Precision *Precision
 }
 
@@ -3763,13 +4068,13 @@ func Gaussmat(sigma float64, minAmpl float64, options *GaussmatOptions) (*Image,
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GaussnoiseOptions struct {
-	// Sigma Standard deviation of pixels in generated image.
+	// Sigma: Standard deviation of pixels in generated image.
 	// libvips default: 30
 	Sigma *float64
-	// Mean Mean of pixels in generated image.
+	// Mean: Mean of pixels in generated image.
 	// libvips default: 128
 	Mean *float64
-	// Seed Random number seed.
+	// Seed: Random number seed.
 	// libvips default: 0
 	Seed *int
 }
@@ -3812,7 +4117,7 @@ func Gaussnoise(width int, height int, options *GaussnoiseOptions) (*Image, erro
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GetpointOptions struct {
-	// UnpackComplex Complex pixels should be unpacked.
+	// UnpackComplex: Complex pixels should be unpacked.
 	// libvips default: false
 	UnpackComplex *bool
 }
@@ -3851,32 +4156,38 @@ func Getpoint(in *Image, x int, y int, options *GetpointOptions) ([]float64, err
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type GifloadOptions struct {
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Gifload runs the libvips "gifload" operation: load GIF with libnsgif.
 //
 // filename: Filename to load from.
 func Gifload(filename string, options *GifloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.N != nil {
@@ -3897,6 +4208,9 @@ func Gifload(filename string, options *GifloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("gifload", args...)
 	if err != nil {
@@ -3908,6 +4222,13 @@ func Gifload(filename string, options *GifloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -3915,32 +4236,38 @@ func Gifload(filename string, options *GifloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type GifloadBufferOptions struct {
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // GifloadBuffer runs the libvips "gifload_buffer" operation: load GIF with libnsgif.
 //
 // buffer: Buffer to load from.
 func GifloadBuffer(buffer []byte, options *GifloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.N != nil {
@@ -3961,6 +4288,9 @@ func GifloadBuffer(buffer []byte, options *GifloadBufferOptions) (*Image, error)
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("gifload_buffer", args...)
 	if err != nil {
@@ -3972,6 +4302,13 @@ func GifloadBuffer(buffer []byte, options *GifloadBufferOptions) (*Image, error)
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -3979,32 +4316,38 @@ func GifloadBuffer(buffer []byte, options *GifloadBufferOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type GifloadSourceOptions struct {
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // GifloadSource runs the libvips "gifload_source" operation: load gif from source.
 //
 // source: Source to load from.
 func GifloadSource(source *Source, options *GifloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.N != nil {
@@ -4025,6 +4368,9 @@ func GifloadSource(source *Source, options *GifloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("gifload_source", args...)
 	if err != nil {
@@ -4036,6 +4382,13 @@ func GifloadSource(source *Source, options *GifloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -4044,39 +4397,39 @@ func GifloadSource(source *Source, options *GifloadSourceOptions) (*Image, error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GifsaveOptions struct {
-	// Dither Amount of dithering.
+	// Dither: Amount of dithering.
 	// libvips default: 1
 	Dither *float64
-	// Effort Quantisation effort.
+	// Effort: Quantisation effort.
 	// libvips default: 7
 	Effort *int
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 8
 	Bitdepth *int
-	// InterframeMaxerror Maximum inter-frame error for transparency.
+	// InterframeMaxerror: Maximum inter-frame error for transparency.
 	// libvips default: 0
 	InterframeMaxerror *float64
-	// Reuse Reuse palette from input.
+	// Reuse: Reuse palette from input.
 	// libvips default: false
 	Reuse *bool
-	// InterpaletteMaxerror Maximum inter-palette error for palette reusage.
+	// InterpaletteMaxerror: Maximum inter-palette error for palette reusage.
 	// libvips default: 3
 	InterpaletteMaxerror *float64
-	// Interlace Generate an interlaced (progressive) GIF.
+	// Interlace: Generate an interlaced (progressive) GIF.
 	// libvips default: false
 	Interlace *bool
-	// KeepDuplicateFrames Keep duplicate frames in the output instead of combining them.
+	// KeepDuplicateFrames: Keep duplicate frames in the output instead of combining them.
 	// libvips default: false
 	KeepDuplicateFrames *bool
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -4140,39 +4493,39 @@ func Gifsave(in *Image, filename string, options *GifsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GifsaveBufferOptions struct {
-	// Dither Amount of dithering.
+	// Dither: Amount of dithering.
 	// libvips default: 1
 	Dither *float64
-	// Effort Quantisation effort.
+	// Effort: Quantisation effort.
 	// libvips default: 7
 	Effort *int
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 8
 	Bitdepth *int
-	// InterframeMaxerror Maximum inter-frame error for transparency.
+	// InterframeMaxerror: Maximum inter-frame error for transparency.
 	// libvips default: 0
 	InterframeMaxerror *float64
-	// Reuse Reuse palette from input.
+	// Reuse: Reuse palette from input.
 	// libvips default: false
 	Reuse *bool
-	// InterpaletteMaxerror Maximum inter-palette error for palette reusage.
+	// InterpaletteMaxerror: Maximum inter-palette error for palette reusage.
 	// libvips default: 3
 	InterpaletteMaxerror *float64
-	// Interlace Generate an interlaced (progressive) GIF.
+	// Interlace: Generate an interlaced (progressive) GIF.
 	// libvips default: false
 	Interlace *bool
-	// KeepDuplicateFrames Keep duplicate frames in the output instead of combining them.
+	// KeepDuplicateFrames: Keep duplicate frames in the output instead of combining them.
 	// libvips default: false
 	KeepDuplicateFrames *bool
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -4238,39 +4591,39 @@ func GifsaveBuffer(in *Image, options *GifsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GifsaveTargetOptions struct {
-	// Dither Amount of dithering.
+	// Dither: Amount of dithering.
 	// libvips default: 1
 	Dither *float64
-	// Effort Quantisation effort.
+	// Effort: Quantisation effort.
 	// libvips default: 7
 	Effort *int
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 8
 	Bitdepth *int
-	// InterframeMaxerror Maximum inter-frame error for transparency.
+	// InterframeMaxerror: Maximum inter-frame error for transparency.
 	// libvips default: 0
 	InterframeMaxerror *float64
-	// Reuse Reuse palette from input.
+	// Reuse: Reuse palette from input.
 	// libvips default: false
 	Reuse *bool
-	// InterpaletteMaxerror Maximum inter-palette error for palette reusage.
+	// InterpaletteMaxerror: Maximum inter-palette error for palette reusage.
 	// libvips default: 3
 	InterpaletteMaxerror *float64
-	// Interlace Generate an interlaced (progressive) GIF.
+	// Interlace: Generate an interlaced (progressive) GIF.
 	// libvips default: false
 	Interlace *bool
-	// KeepDuplicateFrames Keep duplicate frames in the output instead of combining them.
+	// KeepDuplicateFrames: Keep duplicate frames in the output instead of combining them.
 	// libvips default: false
 	KeepDuplicateFrames *bool
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -4334,10 +4687,10 @@ func GifsaveTarget(in *Image, target *Target, options *GifsaveTargetOptions) err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GlobalbalanceOptions struct {
-	// Gamma Image gamma.
+	// Gamma: Image gamma.
 	// libvips default: 1.6
 	Gamma *float64
-	// IntOutput Integer output.
+	// IntOutput: Integer output.
 	// libvips default: false
 	IntOutput *bool
 }
@@ -4374,10 +4727,10 @@ func Globalbalance(in *Image, options *GlobalbalanceOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GravityOptions struct {
-	// Extend How to generate the extra pixels.
-	// libvips default: 0
+	// Extend: How to generate the extra pixels.
+	// libvips default: black (0)
 	Extend *Extend
-	// Background Color for background pixels.
+	// Background: Color for background pixels.
 	Background *[]float64
 }
 
@@ -4422,7 +4775,7 @@ func Gravity(in *Image, direction CompassDirection, width int, height int, optio
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type GreyOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
 }
@@ -4486,38 +4839,44 @@ func Grid(in *Image, tileHeight int, across int, down int) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type HeifloadOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Thumbnail Fetch thumbnail image.
+	// Thumbnail: Fetch thumbnail image.
 	// libvips default: false
 	Thumbnail *bool
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Heifload runs the libvips "heifload" operation: load a HEIF image.
 //
 // filename: Filename to load from.
 func Heifload(filename string, options *HeifloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 9)
+	args := make([]Arg, 0, 10)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Page != nil {
@@ -4544,6 +4903,9 @@ func Heifload(filename string, options *HeifloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("heifload", args...)
 	if err != nil {
@@ -4555,6 +4917,13 @@ func Heifload(filename string, options *HeifloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -4562,38 +4931,44 @@ func Heifload(filename string, options *HeifloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type HeifloadBufferOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Thumbnail Fetch thumbnail image.
+	// Thumbnail: Fetch thumbnail image.
 	// libvips default: false
 	Thumbnail *bool
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // HeifloadBuffer runs the libvips "heifload_buffer" operation: load a HEIF image.
 //
 // buffer: Buffer to load from.
 func HeifloadBuffer(buffer []byte, options *HeifloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 9)
+	args := make([]Arg, 0, 10)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Page != nil {
@@ -4620,6 +4995,9 @@ func HeifloadBuffer(buffer []byte, options *HeifloadBufferOptions) (*Image, erro
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("heifload_buffer", args...)
 	if err != nil {
@@ -4631,6 +5009,13 @@ func HeifloadBuffer(buffer []byte, options *HeifloadBufferOptions) (*Image, erro
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -4638,38 +5023,44 @@ func HeifloadBuffer(buffer []byte, options *HeifloadBufferOptions) (*Image, erro
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type HeifloadSourceOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Thumbnail Fetch thumbnail image.
+	// Thumbnail: Fetch thumbnail image.
 	// libvips default: false
 	Thumbnail *bool
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // HeifloadSource runs the libvips "heifload_source" operation: load a HEIF image.
 //
 // source: Source to load from.
 func HeifloadSource(source *Source, options *HeifloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 9)
+	args := make([]Arg, 0, 10)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Page != nil {
@@ -4696,6 +5087,9 @@ func HeifloadSource(source *Source, options *HeifloadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("heifload_source", args...)
 	if err != nil {
@@ -4707,6 +5101,13 @@ func HeifloadSource(source *Source, options *HeifloadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -4715,38 +5116,38 @@ func HeifloadSource(source *Source, options *HeifloadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HeifsaveOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 50
 	Q *int
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 12
 	Bitdepth *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Compression Compression format.
-	// libvips default: 1
+	// Compression: Compression format.
+	// libvips default: hevc (1)
 	Compression *HeifCompression
-	// Effort CPU effort.
+	// Effort: CPU effort.
 	// libvips default: 4
 	Effort *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 0
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: auto (0)
 	SubsampleMode *ForeignSubsample
-	// Encoder Select encoder to use.
-	// libvips default: 0
+	// Encoder: Select encoder to use.
+	// libvips default: auto (0)
 	Encoder *HeifEncoder
-	// Tune Tuning parameters.
+	// Tune: Tuning parameters.
 	Tune *string
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -4810,38 +5211,38 @@ func Heifsave(in *Image, filename string, options *HeifsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HeifsaveBufferOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 50
 	Q *int
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 12
 	Bitdepth *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Compression Compression format.
-	// libvips default: 1
+	// Compression: Compression format.
+	// libvips default: hevc (1)
 	Compression *HeifCompression
-	// Effort CPU effort.
+	// Effort: CPU effort.
 	// libvips default: 4
 	Effort *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 0
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: auto (0)
 	SubsampleMode *ForeignSubsample
-	// Encoder Select encoder to use.
-	// libvips default: 0
+	// Encoder: Select encoder to use.
+	// libvips default: auto (0)
 	Encoder *HeifEncoder
-	// Tune Tuning parameters.
+	// Tune: Tuning parameters.
 	Tune *string
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -4907,38 +5308,38 @@ func HeifsaveBuffer(in *Image, options *HeifsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HeifsaveTargetOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 50
 	Q *int
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 12
 	Bitdepth *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Compression Compression format.
-	// libvips default: 1
+	// Compression: Compression format.
+	// libvips default: hevc (1)
 	Compression *HeifCompression
-	// Effort CPU effort.
+	// Effort: CPU effort.
 	// libvips default: 4
 	Effort *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 0
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: auto (0)
 	SubsampleMode *ForeignSubsample
-	// Encoder Select encoder to use.
-	// libvips default: 0
+	// Encoder: Select encoder to use.
+	// libvips default: auto (0)
 	Encoder *HeifEncoder
-	// Tune Tuning parameters.
+	// Tune: Tuning parameters.
 	Tune *string
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -5040,7 +5441,7 @@ func HistEntropy(in *Image) (float64, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HistEqualOptions struct {
-	// Band Equalise with this band.
+	// Band: Equalise with this band.
 	// libvips default: -1
 	Band *int
 }
@@ -5074,7 +5475,7 @@ func HistEqual(in *Image, options *HistEqualOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HistFindOptions struct {
-	// Band Find histogram of band.
+	// Band: Find histogram of band.
 	// libvips default: -1
 	Band *int
 }
@@ -5108,8 +5509,8 @@ func HistFind(in *Image, options *HistFindOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HistFindIndexedOptions struct {
-	// Combine Combine bins like this.
-	// libvips default: 1
+	// Combine: Combine bins like this.
+	// libvips default: sum (1)
 	Combine *Combine
 }
 
@@ -5145,7 +5546,7 @@ func HistFindIndexed(in *Image, index *Image, options *HistFindIndexedOptions) (
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HistFindNdimOptions struct {
-	// Bins Number of bins in each dimension.
+	// Bins: Number of bins in each dimension.
 	// libvips default: 10
 	Bins *int
 }
@@ -5198,7 +5599,7 @@ func HistIsmonotonic(in *Image) (bool, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HistLocalOptions struct {
-	// MaxSlope Maximum slope (CLAHE).
+	// MaxSlope: Maximum slope (CLAHE).
 	// libvips default: 0
 	MaxSlope *int
 }
@@ -5298,13 +5699,13 @@ func HistPlot(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HoughCircleOptions struct {
-	// Scale Scale down dimensions by this factor.
+	// Scale: Scale down dimensions by this factor.
 	// libvips default: 1
 	Scale *int
-	// MinRadius Smallest radius to search for.
+	// MinRadius: Smallest radius to search for.
 	// libvips default: 10
 	MinRadius *int
-	// MaxRadius Largest radius to search for.
+	// MaxRadius: Largest radius to search for.
 	// libvips default: 20
 	MaxRadius *int
 }
@@ -5344,10 +5745,10 @@ func HoughCircle(in *Image, options *HoughCircleOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type HoughLineOptions struct {
-	// Width Horizontal size of parameter space.
+	// Width: Horizontal size of parameter space.
 	// libvips default: 256
 	Width *int
-	// Height Vertical size of parameter space.
+	// Height: Vertical size of parameter space.
 	// libvips default: 256
 	Height *int
 }
@@ -5384,18 +5785,18 @@ func HoughLine(in *Image, options *HoughLineOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type IccExportOptions struct {
-	// Pcs Set Profile Connection Space.
-	// libvips default: 0
+	// Pcs: Set Profile Connection Space.
+	// libvips default: lab (0)
 	Pcs *PCS
-	// Intent Rendering intent.
-	// libvips default: 1
+	// Intent: Rendering intent.
+	// libvips default: relative (1)
 	Intent *Intent
-	// BlackPointCompensation Enable black point compensation.
+	// BlackPointCompensation: Enable black point compensation.
 	// libvips default: false
 	BlackPointCompensation *bool
-	// OutputProfile Filename to load output profile from.
+	// OutputProfile: Filename to load output profile from.
 	OutputProfile *string
-	// Depth Output device space depth in bits.
+	// Depth: Output device space depth in bits.
 	// libvips default: 8
 	Depth *int
 }
@@ -5441,19 +5842,19 @@ func IccExport(in *Image, options *IccExportOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type IccImportOptions struct {
-	// Pcs Set Profile Connection Space.
-	// libvips default: 0
+	// Pcs: Set Profile Connection Space.
+	// libvips default: lab (0)
 	Pcs *PCS
-	// Intent Rendering intent.
-	// libvips default: 1
+	// Intent: Rendering intent.
+	// libvips default: relative (1)
 	Intent *Intent
-	// BlackPointCompensation Enable black point compensation.
+	// BlackPointCompensation: Enable black point compensation.
 	// libvips default: false
 	BlackPointCompensation *bool
-	// Embedded Use embedded input profile, if available.
+	// Embedded: Use embedded input profile, if available.
 	// libvips default: false
 	Embedded *bool
-	// InputProfile Filename to load input profile from.
+	// InputProfile: Filename to load input profile from.
 	InputProfile *string
 }
 
@@ -5498,21 +5899,21 @@ func IccImport(in *Image, options *IccImportOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type IccTransformOptions struct {
-	// Pcs Set Profile Connection Space.
-	// libvips default: 0
+	// Pcs: Set Profile Connection Space.
+	// libvips default: lab (0)
 	Pcs *PCS
-	// Intent Rendering intent.
-	// libvips default: 1
+	// Intent: Rendering intent.
+	// libvips default: relative (1)
 	Intent *Intent
-	// BlackPointCompensation Enable black point compensation.
+	// BlackPointCompensation: Enable black point compensation.
 	// libvips default: false
 	BlackPointCompensation *bool
-	// Embedded Use embedded input profile, if available.
+	// Embedded: Use embedded input profile, if available.
 	// libvips default: false
 	Embedded *bool
-	// InputProfile Filename to load input profile from.
+	// InputProfile: Filename to load input profile from.
 	InputProfile *string
-	// Depth Output device space depth in bits.
+	// Depth: Output device space depth in bits.
 	// libvips default: 8
 	Depth *int
 }
@@ -5564,13 +5965,13 @@ func IccTransform(in *Image, outputProfile string, options *IccTransformOptions)
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type IdentityOptions struct {
-	// Bands Number of bands in LUT.
+	// Bands: Number of bands in LUT.
 	// libvips default: 1
 	Bands *int
-	// Ushort Create a 16-bit LUT.
+	// Ushort: Create a 16-bit LUT.
 	// libvips default: false
 	Ushort *bool
-	// Size Size of 16-bit LUT.
+	// Size: Size of 16-bit LUT.
 	// libvips default: 65536
 	Size *int
 }
@@ -5607,7 +6008,7 @@ func Identity(options *IdentityOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type IfthenelseOptions struct {
-	// Blend Blend smoothly between then and else parts.
+	// Blend: Blend smoothly between then and else parts.
 	// libvips default: false
 	Blend *bool
 }
@@ -5647,10 +6048,10 @@ func Ifthenelse(cond *Image, in1 *Image, in2 *Image, options *IfthenelseOptions)
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type InsertOptions struct {
-	// Expand Expand output to hold all of both inputs.
+	// Expand: Expand output to hold all of both inputs.
 	// libvips default: false
 	Expand *bool
-	// Background Color for new pixels.
+	// Background: Color for new pixels.
 	Background *[]float64
 }
 
@@ -5714,7 +6115,7 @@ func Invert(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type InvertlutOptions struct {
-	// Size LUT size to generate.
+	// Size: LUT size to generate.
 	// libvips default: 256
 	Size *int
 }
@@ -5748,7 +6149,7 @@ func Invertlut(in *Image, options *InvertlutOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type InvfftOptions struct {
-	// Real Output only the real part of the transform.
+	// Real: Output only the real part of the transform.
 	// libvips default: false
 	Real *bool
 }
@@ -5782,16 +6183,16 @@ func Invfft(in *Image, options *InvfftOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JoinOptions struct {
-	// Expand Expand output to hold all of both inputs.
+	// Expand: Expand output to hold all of both inputs.
 	// libvips default: false
 	Expand *bool
-	// Shim Pixels between images.
+	// Shim: Pixels between images.
 	// libvips default: 0
 	Shim *int
-	// Background Colour for new pixels.
+	// Background: Colour for new pixels.
 	Background *[]float64
-	// Align Align on the low, centre or high coordinate edge.
-	// libvips default: 0
+	// Align: Align on the low, centre or high coordinate edge.
+	// libvips default: low (0)
 	Align *Align
 }
 
@@ -5838,32 +6239,38 @@ func Join(in1 *Image, in2 *Image, direction Direction, options *JoinOptions) (*I
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type Jp2kloadOptions struct {
-	// Page Load this page from the image.
+	// Page: Load this page from the image.
 	// libvips default: 0
 	Page *int
-	// Oneshot Load images a frame at a time.
+	// Oneshot: Load images a frame at a time.
 	// libvips default: false
 	Oneshot *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Jp2kload runs the libvips "jp2kload" operation: load JPEG2000 image.
 //
 // filename: Filename to load from.
 func Jp2kload(filename string, options *Jp2kloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Page != nil {
@@ -5884,6 +6291,9 @@ func Jp2kload(filename string, options *Jp2kloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jp2kload", args...)
 	if err != nil {
@@ -5895,6 +6305,13 @@ func Jp2kload(filename string, options *Jp2kloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -5902,32 +6319,38 @@ func Jp2kload(filename string, options *Jp2kloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type Jp2kloadBufferOptions struct {
-	// Page Load this page from the image.
+	// Page: Load this page from the image.
 	// libvips default: 0
 	Page *int
-	// Oneshot Load images a frame at a time.
+	// Oneshot: Load images a frame at a time.
 	// libvips default: false
 	Oneshot *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Jp2kloadBuffer runs the libvips "jp2kload_buffer" operation: load JPEG2000 image.
 //
 // buffer: Buffer to load from.
 func Jp2kloadBuffer(buffer []byte, options *Jp2kloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Page != nil {
@@ -5948,6 +6371,9 @@ func Jp2kloadBuffer(buffer []byte, options *Jp2kloadBufferOptions) (*Image, erro
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jp2kload_buffer", args...)
 	if err != nil {
@@ -5959,6 +6385,13 @@ func Jp2kloadBuffer(buffer []byte, options *Jp2kloadBufferOptions) (*Image, erro
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -5966,32 +6399,38 @@ func Jp2kloadBuffer(buffer []byte, options *Jp2kloadBufferOptions) (*Image, erro
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type Jp2kloadSourceOptions struct {
-	// Page Load this page from the image.
+	// Page: Load this page from the image.
 	// libvips default: 0
 	Page *int
-	// Oneshot Load images a frame at a time.
+	// Oneshot: Load images a frame at a time.
 	// libvips default: false
 	Oneshot *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Jp2kloadSource runs the libvips "jp2kload_source" operation: load JPEG2000 image.
 //
 // source: Source to load from.
 func Jp2kloadSource(source *Source, options *Jp2kloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Page != nil {
@@ -6012,6 +6451,9 @@ func Jp2kloadSource(source *Source, options *Jp2kloadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jp2kload_source", args...)
 	if err != nil {
@@ -6023,6 +6465,13 @@ func Jp2kloadSource(source *Source, options *Jp2kloadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -6031,30 +6480,30 @@ func Jp2kloadSource(source *Source, options *Jp2kloadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Jp2ksaveOptions struct {
-	// TileWidth Tile width in pixels.
+	// TileWidth: Tile width in pixels.
 	// libvips default: 512
 	TileWidth *int
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 512
 	TileHeight *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 48
 	Q *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 2
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: off (2)
 	SubsampleMode *ForeignSubsample
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -6109,30 +6558,30 @@ func Jp2ksave(in *Image, filename string, options *Jp2ksaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Jp2ksaveBufferOptions struct {
-	// TileWidth Tile width in pixels.
+	// TileWidth: Tile width in pixels.
 	// libvips default: 512
 	TileWidth *int
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 512
 	TileHeight *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 48
 	Q *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 2
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: off (2)
 	SubsampleMode *ForeignSubsample
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -6189,30 +6638,30 @@ func Jp2ksaveBuffer(in *Image, options *Jp2ksaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Jp2ksaveTargetOptions struct {
-	// TileWidth Tile width in pixels.
+	// TileWidth: Tile width in pixels.
 	// libvips default: 512
 	TileWidth *int
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 512
 	TileHeight *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 48
 	Q *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 2
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: off (2)
 	SubsampleMode *ForeignSubsample
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -6266,35 +6715,41 @@ func Jp2ksaveTarget(in *Image, target *Target, options *Jp2ksaveTargetOptions) e
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type JpegloadOptions struct {
-	// Shrink Shrink factor on load.
+	// Shrink: Shrink factor on load.
 	// libvips default: 1
 	Shrink *int
-	// Autorotate Rotate image using exif orientation.
+	// Autorotate: Rotate image using exif orientation.
 	// libvips default: false
 	Autorotate *bool
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Jpegload runs the libvips "jpegload" operation: load jpeg from file.
 //
 // filename: Filename to load from.
 func Jpegload(filename string, options *JpegloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Shrink != nil {
@@ -6318,6 +6773,9 @@ func Jpegload(filename string, options *JpegloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jpegload", args...)
 	if err != nil {
@@ -6329,6 +6787,13 @@ func Jpegload(filename string, options *JpegloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -6336,35 +6801,41 @@ func Jpegload(filename string, options *JpegloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type JpegloadBufferOptions struct {
-	// Shrink Shrink factor on load.
+	// Shrink: Shrink factor on load.
 	// libvips default: 1
 	Shrink *int
-	// Autorotate Rotate image using exif orientation.
+	// Autorotate: Rotate image using exif orientation.
 	// libvips default: false
 	Autorotate *bool
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // JpegloadBuffer runs the libvips "jpegload_buffer" operation: load jpeg from buffer.
 //
 // buffer: Buffer to load from.
 func JpegloadBuffer(buffer []byte, options *JpegloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Shrink != nil {
@@ -6388,6 +6859,9 @@ func JpegloadBuffer(buffer []byte, options *JpegloadBufferOptions) (*Image, erro
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jpegload_buffer", args...)
 	if err != nil {
@@ -6399,6 +6873,13 @@ func JpegloadBuffer(buffer []byte, options *JpegloadBufferOptions) (*Image, erro
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -6406,35 +6887,41 @@ func JpegloadBuffer(buffer []byte, options *JpegloadBufferOptions) (*Image, erro
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type JpegloadSourceOptions struct {
-	// Shrink Shrink factor on load.
+	// Shrink: Shrink factor on load.
 	// libvips default: 1
 	Shrink *int
-	// Autorotate Rotate image using exif orientation.
+	// Autorotate: Rotate image using exif orientation.
 	// libvips default: false
 	Autorotate *bool
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // JpegloadSource runs the libvips "jpegload_source" operation: load image from jpeg source.
 //
 // source: Source to load from.
 func JpegloadSource(source *Source, options *JpegloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Shrink != nil {
@@ -6458,6 +6945,9 @@ func JpegloadSource(source *Source, options *JpegloadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jpegload_source", args...)
 	if err != nil {
@@ -6469,6 +6959,13 @@ func JpegloadSource(source *Source, options *JpegloadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -6477,42 +6974,42 @@ func JpegloadSource(source *Source, options *JpegloadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JpegsaveOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// OptimizeCoding Compute optimal Huffman coding tables.
+	// OptimizeCoding: Compute optimal Huffman coding tables.
 	// libvips default: false
 	OptimizeCoding *bool
-	// Interlace Generate an interlaced (progressive) jpeg.
+	// Interlace: Generate an interlaced (progressive) jpeg.
 	// libvips default: false
 	Interlace *bool
-	// TrellisQuant Apply trellis quantisation to each 8x8 block.
+	// TrellisQuant: Apply trellis quantisation to each 8x8 block.
 	// libvips default: false
 	TrellisQuant *bool
-	// OvershootDeringing Apply overshooting to samples with extreme values.
+	// OvershootDeringing: Apply overshooting to samples with extreme values.
 	// libvips default: false
 	OvershootDeringing *bool
-	// OptimizeScans Split spectrum of DCT coefficients into separate scans.
+	// OptimizeScans: Split spectrum of DCT coefficients into separate scans.
 	// libvips default: false
 	OptimizeScans *bool
-	// QuantTable Use predefined quantization table with given index.
+	// QuantTable: Use predefined quantization table with given index.
 	// libvips default: 0
 	QuantTable *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 0
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: auto (0)
 	SubsampleMode *ForeignSubsample
-	// RestartInterval Add restart markers every specified number of mcu.
+	// RestartInterval: Add restart markers every specified number of mcu.
 	// libvips default: 0
 	RestartInterval *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -6579,42 +7076,42 @@ func Jpegsave(in *Image, filename string, options *JpegsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JpegsaveBufferOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// OptimizeCoding Compute optimal Huffman coding tables.
+	// OptimizeCoding: Compute optimal Huffman coding tables.
 	// libvips default: false
 	OptimizeCoding *bool
-	// Interlace Generate an interlaced (progressive) jpeg.
+	// Interlace: Generate an interlaced (progressive) jpeg.
 	// libvips default: false
 	Interlace *bool
-	// TrellisQuant Apply trellis quantisation to each 8x8 block.
+	// TrellisQuant: Apply trellis quantisation to each 8x8 block.
 	// libvips default: false
 	TrellisQuant *bool
-	// OvershootDeringing Apply overshooting to samples with extreme values.
+	// OvershootDeringing: Apply overshooting to samples with extreme values.
 	// libvips default: false
 	OvershootDeringing *bool
-	// OptimizeScans Split spectrum of DCT coefficients into separate scans.
+	// OptimizeScans: Split spectrum of DCT coefficients into separate scans.
 	// libvips default: false
 	OptimizeScans *bool
-	// QuantTable Use predefined quantization table with given index.
+	// QuantTable: Use predefined quantization table with given index.
 	// libvips default: 0
 	QuantTable *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 0
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: auto (0)
 	SubsampleMode *ForeignSubsample
-	// RestartInterval Add restart markers every specified number of mcu.
+	// RestartInterval: Add restart markers every specified number of mcu.
 	// libvips default: 0
 	RestartInterval *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -6683,42 +7180,42 @@ func JpegsaveBuffer(in *Image, options *JpegsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JpegsaveMimeOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// OptimizeCoding Compute optimal Huffman coding tables.
+	// OptimizeCoding: Compute optimal Huffman coding tables.
 	// libvips default: false
 	OptimizeCoding *bool
-	// Interlace Generate an interlaced (progressive) jpeg.
+	// Interlace: Generate an interlaced (progressive) jpeg.
 	// libvips default: false
 	Interlace *bool
-	// TrellisQuant Apply trellis quantisation to each 8x8 block.
+	// TrellisQuant: Apply trellis quantisation to each 8x8 block.
 	// libvips default: false
 	TrellisQuant *bool
-	// OvershootDeringing Apply overshooting to samples with extreme values.
+	// OvershootDeringing: Apply overshooting to samples with extreme values.
 	// libvips default: false
 	OvershootDeringing *bool
-	// OptimizeScans Split spectrum of DCT coefficients into separate scans.
+	// OptimizeScans: Split spectrum of DCT coefficients into separate scans.
 	// libvips default: false
 	OptimizeScans *bool
-	// QuantTable Use predefined quantization table with given index.
+	// QuantTable: Use predefined quantization table with given index.
 	// libvips default: 0
 	QuantTable *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 0
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: auto (0)
 	SubsampleMode *ForeignSubsample
-	// RestartInterval Add restart markers every specified number of mcu.
+	// RestartInterval: Add restart markers every specified number of mcu.
 	// libvips default: 0
 	RestartInterval *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -6782,42 +7279,42 @@ func JpegsaveMime(in *Image, options *JpegsaveMimeOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JpegsaveTargetOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// OptimizeCoding Compute optimal Huffman coding tables.
+	// OptimizeCoding: Compute optimal Huffman coding tables.
 	// libvips default: false
 	OptimizeCoding *bool
-	// Interlace Generate an interlaced (progressive) jpeg.
+	// Interlace: Generate an interlaced (progressive) jpeg.
 	// libvips default: false
 	Interlace *bool
-	// TrellisQuant Apply trellis quantisation to each 8x8 block.
+	// TrellisQuant: Apply trellis quantisation to each 8x8 block.
 	// libvips default: false
 	TrellisQuant *bool
-	// OvershootDeringing Apply overshooting to samples with extreme values.
+	// OvershootDeringing: Apply overshooting to samples with extreme values.
 	// libvips default: false
 	OvershootDeringing *bool
-	// OptimizeScans Split spectrum of DCT coefficients into separate scans.
+	// OptimizeScans: Split spectrum of DCT coefficients into separate scans.
 	// libvips default: false
 	OptimizeScans *bool
-	// QuantTable Use predefined quantization table with given index.
+	// QuantTable: Use predefined quantization table with given index.
 	// libvips default: 0
 	QuantTable *int
-	// SubsampleMode Select chroma subsample operation mode.
-	// libvips default: 0
+	// SubsampleMode: Select chroma subsample operation mode.
+	// libvips default: auto (0)
 	SubsampleMode *ForeignSubsample
-	// RestartInterval Add restart markers every specified number of mcu.
+	// RestartInterval: Add restart markers every specified number of mcu.
 	// libvips default: 0
 	RestartInterval *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -6883,32 +7380,38 @@ func JpegsaveTarget(in *Image, target *Target, options *JpegsaveTargetOptions) e
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type JxlloadOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Jxlload runs the libvips "jxlload" operation: load JPEG-XL image.
 //
 // filename: Filename to load from.
 func Jxlload(filename string, options *JxlloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Page != nil {
@@ -6929,6 +7432,9 @@ func Jxlload(filename string, options *JxlloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jxlload", args...)
 	if err != nil {
@@ -6940,6 +7446,13 @@ func Jxlload(filename string, options *JxlloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -6947,32 +7460,38 @@ func Jxlload(filename string, options *JxlloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type JxlloadBufferOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // JxlloadBuffer runs the libvips "jxlload_buffer" operation: load JPEG-XL image.
 //
 // buffer: Buffer to load from.
 func JxlloadBuffer(buffer []byte, options *JxlloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Page != nil {
@@ -6993,6 +7512,9 @@ func JxlloadBuffer(buffer []byte, options *JxlloadBufferOptions) (*Image, error)
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jxlload_buffer", args...)
 	if err != nil {
@@ -7004,6 +7526,13 @@ func JxlloadBuffer(buffer []byte, options *JxlloadBufferOptions) (*Image, error)
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -7011,32 +7540,38 @@ func JxlloadBuffer(buffer []byte, options *JxlloadBufferOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type JxlloadSourceOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // JxlloadSource runs the libvips "jxlload_source" operation: load JPEG-XL image.
 //
 // source: Source to load from.
 func JxlloadSource(source *Source, options *JxlloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 7)
+	args := make([]Arg, 0, 8)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Page != nil {
@@ -7057,6 +7592,9 @@ func JxlloadSource(source *Source, options *JxlloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("jxlload_source", args...)
 	if err != nil {
@@ -7068,6 +7606,13 @@ func JxlloadSource(source *Source, options *JxlloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -7076,33 +7621,33 @@ func JxlloadSource(source *Source, options *JxlloadSourceOptions) (*Image, error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JxlsaveOptions struct {
-	// Tier Decode speed tier.
+	// Tier: Decode speed tier.
 	// libvips default: 0
 	Tier *int
-	// Distance Target butteraugli distance.
+	// Distance: Target butteraugli distance.
 	// libvips default: 1
 	Distance *float64
-	// Effort Encoding effort.
+	// Effort: Encoding effort.
 	// libvips default: 7
 	Effort *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Q Quality factor.
+	// Q: Quality factor.
 	// libvips default: 75
 	Q *int
-	// Bitdepth Bit depth.
+	// Bitdepth: Bit depth.
 	// libvips default: 8
 	Bitdepth *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -7160,33 +7705,33 @@ func Jxlsave(in *Image, filename string, options *JxlsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JxlsaveBufferOptions struct {
-	// Tier Decode speed tier.
+	// Tier: Decode speed tier.
 	// libvips default: 0
 	Tier *int
-	// Distance Target butteraugli distance.
+	// Distance: Target butteraugli distance.
 	// libvips default: 1
 	Distance *float64
-	// Effort Encoding effort.
+	// Effort: Encoding effort.
 	// libvips default: 7
 	Effort *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Q Quality factor.
+	// Q: Quality factor.
 	// libvips default: 75
 	Q *int
-	// Bitdepth Bit depth.
+	// Bitdepth: Bit depth.
 	// libvips default: 8
 	Bitdepth *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -7246,33 +7791,33 @@ func JxlsaveBuffer(in *Image, options *JxlsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type JxlsaveTargetOptions struct {
-	// Tier Decode speed tier.
+	// Tier: Decode speed tier.
 	// libvips default: 0
 	Tier *int
-	// Distance Target butteraugli distance.
+	// Distance: Target butteraugli distance.
 	// libvips default: 1
 	Distance *float64
-	// Effort Encoding effort.
+	// Effort: Encoding effort.
 	// libvips default: 7
 	Effort *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Q Quality factor.
+	// Q: Quality factor.
 	// libvips default: 75
 	Q *int
-	// Bitdepth Bit depth.
+	// Bitdepth: Bit depth.
 	// libvips default: 8
 	Bitdepth *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -7325,12 +7870,30 @@ func JxlsaveTarget(in *Image, target *Target, options *JxlsaveTargetOptions) err
 	return nil
 }
 
+// LabelregionsOptions holds the optional arguments of labelregions.
+//
+// A nil field is not sent, so libvips applies its own default. A non-nil
+// field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
+type LabelregionsOptions struct {
+	// Segments: output — Number of discrete contiguous regions.
+	Segments *int
+}
+
 // Labelregions runs the libvips "labelregions" operation: label regions in an image.
 //
 // in: Input image argument.
-func Labelregions(in *Image) (*Image, error) {
-	args := make([]Arg, 0, 1)
+func Labelregions(in *Image, options *LabelregionsOptions) (*Image, error) {
+	args := make([]Arg, 0, 2)
 	args = append(args, In("in", in))
+	if options != nil {
+		if options.Segments != nil {
+			args = append(args, Out("segments"))
+		}
+	}
 	outs, err := Call("labelregions", args...)
 	if err != nil {
 		return nil, err
@@ -7341,6 +7904,13 @@ func Labelregions(in *Image) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Segments != nil {
+			if v, err := outs.Int("segments"); err == nil {
+				*options.Segments = v
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -7349,7 +7919,7 @@ func Labelregions(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type LinearOptions struct {
-	// Uchar Output should be uchar.
+	// Uchar: Output should be uchar.
 	// libvips default: false
 	Uchar *bool
 }
@@ -7389,16 +7959,16 @@ func Linear(in *Image, a []float64, b []float64, options *LinearOptions) (*Image
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type LinecacheOptions struct {
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 128
 	TileHeight *int
-	// Access Expected access pattern.
-	// libvips default: 0
+	// Access: Expected access pattern.
+	// libvips default: random (0)
 	Access *Access
-	// Threaded Allow threaded access.
+	// Threaded: Allow threaded access.
 	// libvips default: false
 	Threaded *bool
-	// Persistent Keep cache between evaluations.
+	// Persistent: Keep cache between evaluations.
 	// libvips default: false
 	Persistent *bool
 }
@@ -7441,11 +8011,11 @@ func Linecache(in *Image, options *LinecacheOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type LogmatOptions struct {
-	// Separable Generate separable Gaussian.
+	// Separable: Generate separable Gaussian.
 	// libvips default: false
 	Separable *bool
-	// Precision Generate with this precision.
-	// libvips default: 0
+	// Precision: Generate with this precision.
+	// libvips default: integer (0)
 	Precision *Precision
 }
 
@@ -7483,34 +8053,40 @@ func Logmat(sigma float64, minAmpl float64, options *LogmatOptions) (*Image, err
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MagickloadOptions struct {
-	// Density Canvas resolution for rendering vector formats like SVG.
+	// Density: Canvas resolution for rendering vector formats like SVG.
 	Density *string
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Magickload runs the libvips "magickload" operation: load file with ImageMagick7.
 //
 // filename: Filename to load from.
 func Magickload(filename string, options *MagickloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Density != nil {
@@ -7534,6 +8110,9 @@ func Magickload(filename string, options *MagickloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("magickload", args...)
 	if err != nil {
@@ -7545,6 +8124,13 @@ func Magickload(filename string, options *MagickloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -7552,34 +8138,40 @@ func Magickload(filename string, options *MagickloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MagickloadBufferOptions struct {
-	// Density Canvas resolution for rendering vector formats like SVG.
+	// Density: Canvas resolution for rendering vector formats like SVG.
 	Density *string
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // MagickloadBuffer runs the libvips "magickload_buffer" operation: load buffer with ImageMagick7.
 //
 // buffer: Buffer to load from.
 func MagickloadBuffer(buffer []byte, options *MagickloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Density != nil {
@@ -7603,6 +8195,9 @@ func MagickloadBuffer(buffer []byte, options *MagickloadBufferOptions) (*Image, 
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("magickload_buffer", args...)
 	if err != nil {
@@ -7614,6 +8209,13 @@ func MagickloadBuffer(buffer []byte, options *MagickloadBufferOptions) (*Image, 
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -7621,34 +8223,40 @@ func MagickloadBuffer(buffer []byte, options *MagickloadBufferOptions) (*Image, 
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MagickloadSourceOptions struct {
-	// Density Canvas resolution for rendering vector formats like SVG.
+	// Density: Canvas resolution for rendering vector formats like SVG.
 	Density *string
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // MagickloadSource runs the libvips "magickload_source" operation: load source with ImageMagick7.
 //
 // source: Source to load from.
 func MagickloadSource(source *Source, options *MagickloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Density != nil {
@@ -7672,6 +8280,9 @@ func MagickloadSource(source *Source, options *MagickloadSourceOptions) (*Image,
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("magickload_source", args...)
 	if err != nil {
@@ -7683,6 +8294,13 @@ func MagickloadSource(source *Source, options *MagickloadSourceOptions) (*Image,
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -7691,29 +8309,29 @@ func MagickloadSource(source *Source, options *MagickloadSourceOptions) (*Image,
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MagicksaveOptions struct {
-	// Format Format to save in.
+	// Format: Format to save in.
 	Format *string
-	// Quality Quality to use.
+	// Quality: Quality to use.
 	// libvips default: 0
 	Quality *int
-	// OptimizeGifFrames Apply GIF frames optimization.
+	// OptimizeGifFrames: Apply GIF frames optimization.
 	// libvips default: false
 	OptimizeGifFrames *bool
-	// OptimizeGifTransparency Apply GIF transparency optimization.
+	// OptimizeGifTransparency: Apply GIF transparency optimization.
 	// libvips default: false
 	OptimizeGifTransparency *bool
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 0
 	Bitdepth *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -7768,29 +8386,29 @@ func Magicksave(in *Image, filename string, options *MagicksaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MagicksaveBufferOptions struct {
-	// Format Format to save in.
+	// Format: Format to save in.
 	Format *string
-	// Quality Quality to use.
+	// Quality: Quality to use.
 	// libvips default: 0
 	Quality *int
-	// OptimizeGifFrames Apply GIF frames optimization.
+	// OptimizeGifFrames: Apply GIF frames optimization.
 	// libvips default: false
 	OptimizeGifFrames *bool
-	// OptimizeGifTransparency Apply GIF transparency optimization.
+	// OptimizeGifTransparency: Apply GIF transparency optimization.
 	// libvips default: false
 	OptimizeGifTransparency *bool
-	// Bitdepth Number of bits per pixel.
+	// Bitdepth: Number of bits per pixel.
 	// libvips default: 0
 	Bitdepth *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -7847,15 +8465,15 @@ func MagicksaveBuffer(in *Image, options *MagicksaveBufferOptions) ([]byte, erro
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MapimOptions struct {
-	// Interpolate Interpolate pixels with this.
-	Interpolate **Interpolate
-	// Background Background value.
+	// Interpolate: Interpolate pixels with this.
+	Interpolate *Interpolate
+	// Background: Background value.
 	Background *[]float64
-	// Premultiplied Images have premultiplied alpha.
+	// Premultiplied: Images have premultiplied alpha.
 	// libvips default: false
 	Premultiplied *bool
-	// Extend How to generate the extra pixels.
-	// libvips default: 5
+	// Extend: How to generate the extra pixels.
+	// libvips default: background (5)
 	Extend *Extend
 }
 
@@ -7870,7 +8488,7 @@ func Mapim(in *Image, index *Image, options *MapimOptions) (*Image, error) {
 	args = append(args, In("index", index))
 	if options != nil {
 		if options.Interpolate != nil {
-			args = append(args, In("interpolate", *options.Interpolate))
+			args = append(args, In("interpolate", options.Interpolate))
 		}
 		if options.Background != nil {
 			args = append(args, In("background", *options.Background))
@@ -7900,7 +8518,7 @@ func Mapim(in *Image, index *Image, options *MapimOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaplutOptions struct {
-	// Band Apply one-band lut to this band of in.
+	// Band: Apply one-band lut to this band of in.
 	// libvips default: -1
 	Band *int
 }
@@ -7937,16 +8555,16 @@ func Maplut(in *Image, lut *Image, options *MaplutOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskButterworthOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8001,16 +8619,16 @@ func MaskButterworth(width int, height int, order float64, frequencyCutoff float
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskButterworthBandOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8071,16 +8689,16 @@ func MaskButterworthBand(width int, height int, order float64, frequencyCutoffX 
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskButterworthRingOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8138,16 +8756,16 @@ func MaskButterworthRing(width int, height int, order float64, frequencyCutoff f
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskFractalOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8196,16 +8814,16 @@ func MaskFractal(width int, height int, fractalDimension float64, options *MaskF
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskGaussianOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8257,16 +8875,16 @@ func MaskGaussian(width int, height int, frequencyCutoff float64, amplitudeCutof
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskGaussianBandOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8324,16 +8942,16 @@ func MaskGaussianBand(width int, height int, frequencyCutoffX float64, frequency
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskGaussianRingOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8388,16 +9006,16 @@ func MaskGaussianRing(width int, height int, frequencyCutoff float64, amplitudeC
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskIdealOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8446,16 +9064,16 @@ func MaskIdeal(width int, height int, frequencyCutoff float64, options *MaskIdea
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskIdealBandOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8510,16 +9128,16 @@ func MaskIdealBand(width int, height int, frequencyCutoffX float64, frequencyCut
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MaskIdealRingOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Nodc Remove DC component.
+	// Nodc: Remove DC component.
 	// libvips default: false
 	Nodc *bool
-	// Reject Invert the sense of the filter.
+	// Reject: Invert the sense of the filter.
 	// libvips default: false
 	Reject *bool
-	// Optical Rotate quadrants to optical space.
+	// Optical: Rotate quadrants to optical space.
 	// libvips default: false
 	Optical *bool
 }
@@ -8571,17 +9189,17 @@ func MaskIdealRing(width int, height int, frequencyCutoff float64, ringwidth flo
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MatchOptions struct {
-	// Hwindow Half window size.
+	// Hwindow: Half window size.
 	// libvips default: 5
 	Hwindow *int
-	// Harea Half area size.
+	// Harea: Half area size.
 	// libvips default: 15
 	Harea *int
-	// Search Search to improve tie-points.
+	// Search: Search to improve tie-points.
 	// libvips default: false
 	Search *bool
-	// Interpolate Interpolate pixels with this.
-	Interpolate **Interpolate
+	// Interpolate: Interpolate pixels with this.
+	Interpolate *Interpolate
 }
 
 // Match runs the libvips "match" operation: first-order match of two images.
@@ -8628,7 +9246,7 @@ func Match(ref *Image, sec *Image, xr1 int, yr1 int, xs1 int, ys1 int, xr2 int, 
 			args = append(args, In("search", *options.Search))
 		}
 		if options.Interpolate != nil {
-			args = append(args, In("interpolate", *options.Interpolate))
+			args = append(args, In("interpolate", options.Interpolate))
 		}
 	}
 	outs, err := Call("match", args...)
@@ -8720,26 +9338,32 @@ func Math2Const(in *Image, math2 OperationMath2, c []float64) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MatloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Matload runs the libvips "matload" operation: load mat from file.
 //
 // filename: Filename to load from.
 func Matload(filename string, options *MatloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -8754,6 +9378,9 @@ func Matload(filename string, options *MatloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("matload", args...)
 	if err != nil {
@@ -8765,6 +9392,13 @@ func Matload(filename string, options *MatloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -8791,26 +9425,32 @@ func Matrixinvert(in *Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MatrixloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Matrixload runs the libvips "matrixload" operation: load matrix.
 //
 // filename: Filename to load from.
 func Matrixload(filename string, options *MatrixloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -8825,6 +9465,9 @@ func Matrixload(filename string, options *MatrixloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("matrixload", args...)
 	if err != nil {
@@ -8836,6 +9479,13 @@ func Matrixload(filename string, options *MatrixloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -8843,26 +9493,32 @@ func Matrixload(filename string, options *MatrixloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MatrixloadSourceOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // MatrixloadSource runs the libvips "matrixload_source" operation: load matrix.
 //
 // source: Source to load from.
 func MatrixloadSource(source *Source, options *MatrixloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Memory != nil {
@@ -8877,6 +9533,9 @@ func MatrixloadSource(source *Source, options *MatrixloadSourceOptions) (*Image,
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("matrixload_source", args...)
 	if err != nil {
@@ -8888,6 +9547,13 @@ func MatrixloadSource(source *Source, options *MatrixloadSourceOptions) (*Image,
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -8918,15 +9584,15 @@ func Matrixmultiply(left *Image, right *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MatrixprintOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -8963,15 +9629,15 @@ func Matrixprint(in *Image, options *MatrixprintOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MatrixsaveOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -9011,15 +9677,15 @@ func Matrixsave(in *Image, filename string, options *MatrixsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MatrixsaveTargetOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -9058,21 +9724,50 @@ func MatrixsaveTarget(in *Image, target *Target, options *MatrixsaveTargetOption
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MaxOptions struct {
-	// Size Number of maximum values to find.
+	// Size: Number of maximum values to find.
 	// libvips default: 1
 	Size *int
+	// X: output — Horizontal position of maximum.
+	X *int
+	// Y: output — Vertical position of maximum.
+	Y *int
+	// OutArray: output — Array of output values.
+	OutArray *[]float64
+	// XArray: output — Array of horizontal positions.
+	XArray *[]int
+	// YArray: output — Array of vertical positions.
+	YArray *[]int
 }
 
 // Max runs the libvips "max" operation: find image maximum.
 //
 // in: Input image.
 func Max(in *Image, options *MaxOptions) (float64, error) {
-	args := make([]Arg, 0, 2)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("in", in))
 	if options != nil {
 		if options.Size != nil {
 			args = append(args, In("size", *options.Size))
+		}
+		if options.X != nil {
+			args = append(args, Out("x"))
+		}
+		if options.Y != nil {
+			args = append(args, Out("y"))
+		}
+		if options.OutArray != nil {
+			args = append(args, Out("out-array"))
+		}
+		if options.XArray != nil {
+			args = append(args, Out("x-array"))
+		}
+		if options.YArray != nil {
+			args = append(args, Out("y-array"))
 		}
 	}
 	outs, err := Call("max", args...)
@@ -9085,6 +9780,33 @@ func Max(in *Image, options *MaxOptions) (float64, error) {
 		return 0, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.X != nil {
+			if v, err := outs.Int("x"); err == nil {
+				*options.X = v
+			}
+		}
+		if options.Y != nil {
+			if v, err := outs.Int("y"); err == nil {
+				*options.Y = v
+			}
+		}
+		if options.OutArray != nil {
+			if v, err := outs.Floats("out-array"); err == nil {
+				*options.OutArray = v
+			}
+		}
+		if options.XArray != nil {
+			if v, err := outs.Ints("x-array"); err == nil {
+				*options.XArray = v
+			}
+		}
+		if options.YArray != nil {
+			if v, err := outs.Ints("y-array"); err == nil {
+				*options.YArray = v
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9115,16 +9837,16 @@ func Maxpair(left *Image, right *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MeasureOptions struct {
-	// Left Left edge of extract area.
+	// Left: Left edge of extract area.
 	// libvips default: 0
 	Left *int
-	// Top Top edge of extract area.
+	// Top: Top edge of extract area.
 	// libvips default: 0
 	Top *int
-	// Width Width of extract area.
+	// Width: Width of extract area.
 	// libvips default: 1
 	Width *int
-	// Height Height of extract area.
+	// Height: Height of extract area.
 	// libvips default: 1
 	Height *int
 }
@@ -9173,7 +9895,7 @@ func Measure(in *Image, h int, v int, options *MeasureOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MergeOptions struct {
-	// Mblend Maximum blend size.
+	// Mblend: Maximum blend size.
 	// libvips default: 10
 	Mblend *int
 }
@@ -9218,21 +9940,50 @@ func Merge(ref *Image, sec *Image, direction Direction, dx int, dy int, options 
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MinOptions struct {
-	// Size Number of minimum values to find.
+	// Size: Number of minimum values to find.
 	// libvips default: 1
 	Size *int
+	// X: output — Horizontal position of minimum.
+	X *int
+	// Y: output — Vertical position of minimum.
+	Y *int
+	// OutArray: output — Array of output values.
+	OutArray *[]float64
+	// XArray: output — Array of horizontal positions.
+	XArray *[]int
+	// YArray: output — Array of vertical positions.
+	YArray *[]int
 }
 
 // Min runs the libvips "min" operation: find image minimum.
 //
 // in: Input image.
 func Min(in *Image, options *MinOptions) (float64, error) {
-	args := make([]Arg, 0, 2)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("in", in))
 	if options != nil {
 		if options.Size != nil {
 			args = append(args, In("size", *options.Size))
+		}
+		if options.X != nil {
+			args = append(args, Out("x"))
+		}
+		if options.Y != nil {
+			args = append(args, Out("y"))
+		}
+		if options.OutArray != nil {
+			args = append(args, Out("out-array"))
+		}
+		if options.XArray != nil {
+			args = append(args, Out("x-array"))
+		}
+		if options.YArray != nil {
+			args = append(args, Out("y-array"))
 		}
 	}
 	outs, err := Call("min", args...)
@@ -9245,6 +9996,33 @@ func Min(in *Image, options *MinOptions) (float64, error) {
 		return 0, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.X != nil {
+			if v, err := outs.Int("x"); err == nil {
+				*options.X = v
+			}
+		}
+		if options.Y != nil {
+			if v, err := outs.Int("y"); err == nil {
+				*options.Y = v
+			}
+		}
+		if options.OutArray != nil {
+			if v, err := outs.Floats("out-array"); err == nil {
+				*options.OutArray = v
+			}
+		}
+		if options.XArray != nil {
+			if v, err := outs.Ints("x-array"); err == nil {
+				*options.XArray = v
+			}
+		}
+		if options.YArray != nil {
+			if v, err := outs.Ints("y-array"); err == nil {
+				*options.YArray = v
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9299,19 +10077,35 @@ func Morph(in *Image, mask *Image, morph OperationMorphology) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type MosaicOptions struct {
-	// Hwindow Half window size.
+	// Hwindow: Half window size.
 	// libvips default: 5
 	Hwindow *int
-	// Harea Half area size.
+	// Harea: Half area size.
 	// libvips default: 15
 	Harea *int
-	// Mblend Maximum blend size.
+	// Mblend: Maximum blend size.
 	// libvips default: 10
 	Mblend *int
-	// Bandno Band to search for features on.
+	// Bandno: Band to search for features on.
 	// libvips default: 0
 	Bandno *int
+	// Dx0: output — Detected integer offset.
+	Dx0 *int
+	// Dy0: output — Detected integer offset.
+	Dy0 *int
+	// Scale1: output — Detected scale.
+	Scale1 *float64
+	// Angle1: output — Detected rotation.
+	Angle1 *float64
+	// Dy1: output — Detected first-order displacement.
+	Dy1 *float64
+	// Dx1: output — Detected first-order displacement.
+	Dx1 *float64
 }
 
 // Mosaic runs the libvips "mosaic" operation: mosaic two images.
@@ -9330,7 +10124,7 @@ type MosaicOptions struct {
 //
 // ysec: Position of secondary tie-point.
 func Mosaic(ref *Image, sec *Image, direction Direction, xref int, yref int, xsec int, ysec int, options *MosaicOptions) (*Image, error) {
-	args := make([]Arg, 0, 11)
+	args := make([]Arg, 0, 17)
 	args = append(args, In("ref", ref))
 	args = append(args, In("sec", sec))
 	args = append(args, In("direction", int(direction)))
@@ -9351,6 +10145,24 @@ func Mosaic(ref *Image, sec *Image, direction Direction, xref int, yref int, xse
 		if options.Bandno != nil {
 			args = append(args, In("bandno", *options.Bandno))
 		}
+		if options.Dx0 != nil {
+			args = append(args, Out("dx0"))
+		}
+		if options.Dy0 != nil {
+			args = append(args, Out("dy0"))
+		}
+		if options.Scale1 != nil {
+			args = append(args, Out("scale1"))
+		}
+		if options.Angle1 != nil {
+			args = append(args, Out("angle1"))
+		}
+		if options.Dy1 != nil {
+			args = append(args, Out("dy1"))
+		}
+		if options.Dx1 != nil {
+			args = append(args, Out("dx1"))
+		}
 	}
 	outs, err := Call("mosaic", args...)
 	if err != nil {
@@ -9362,6 +10174,38 @@ func Mosaic(ref *Image, sec *Image, direction Direction, xref int, yref int, xse
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Dx0 != nil {
+			if v, err := outs.Int("dx0"); err == nil {
+				*options.Dx0 = v
+			}
+		}
+		if options.Dy0 != nil {
+			if v, err := outs.Int("dy0"); err == nil {
+				*options.Dy0 = v
+			}
+		}
+		if options.Scale1 != nil {
+			if v, err := outs.Float("scale1"); err == nil {
+				*options.Scale1 = v
+			}
+		}
+		if options.Angle1 != nil {
+			if v, err := outs.Float("angle1"); err == nil {
+				*options.Angle1 = v
+			}
+		}
+		if options.Dy1 != nil {
+			if v, err := outs.Float("dy1"); err == nil {
+				*options.Dy1 = v
+			}
+		}
+		if options.Dx1 != nil {
+			if v, err := outs.Float("dx1"); err == nil {
+				*options.Dx1 = v
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9370,18 +10214,18 @@ func Mosaic(ref *Image, sec *Image, direction Direction, xref int, yref int, xse
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Mosaic1Options struct {
-	// Hwindow Half window size.
+	// Hwindow: Half window size.
 	// libvips default: 5
 	Hwindow *int
-	// Harea Half area size.
+	// Harea: Half area size.
 	// libvips default: 15
 	Harea *int
-	// Search Search to improve tie-points.
+	// Search: Search to improve tie-points.
 	// libvips default: false
 	Search *bool
-	// Interpolate Interpolate pixels with this.
-	Interpolate **Interpolate
-	// Mblend Maximum blend size.
+	// Interpolate: Interpolate pixels with this.
+	Interpolate *Interpolate
+	// Mblend: Maximum blend size.
 	// libvips default: 10
 	Mblend *int
 }
@@ -9433,7 +10277,7 @@ func Mosaic1(ref *Image, sec *Image, direction Direction, xr1 int, yr1 int, xs1 
 			args = append(args, In("search", *options.Search))
 		}
 		if options.Interpolate != nil {
-			args = append(args, In("interpolate", *options.Interpolate))
+			args = append(args, In("interpolate", options.Interpolate))
 		}
 		if options.Mblend != nil {
 			args = append(args, In("mblend", *options.Mblend))
@@ -9457,7 +10301,7 @@ func Mosaic1(ref *Image, sec *Image, direction Direction, xr1 int, yr1 int, xs1 
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type MsbOptions struct {
-	// Band Band to msb.
+	// Band: Band to msb.
 	// libvips default: -1
 	Band *int
 }
@@ -9512,26 +10356,32 @@ func Multiply(left *Image, right *Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type OpenexrloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Openexrload runs the libvips "openexrload" operation: load an OpenEXR image.
 //
 // filename: Filename to load from.
 func Openexrload(filename string, options *OpenexrloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -9546,6 +10396,9 @@ func Openexrload(filename string, options *OpenexrloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("openexrload", args...)
 	if err != nil {
@@ -9557,6 +10410,13 @@ func Openexrload(filename string, options *OpenexrloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9564,40 +10424,46 @@ func Openexrload(filename string, options *OpenexrloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type OpenslideloadOptions struct {
-	// Level Load this level from the file.
+	// Level: Load this level from the file.
 	// libvips default: 0
 	Level *int
-	// Autocrop Crop to image bounds.
+	// Autocrop: Crop to image bounds.
 	// libvips default: false
 	Autocrop *bool
-	// Associated Load this associated image.
+	// Associated: Load this associated image.
 	Associated *string
-	// AttachAssociated Attach all associated images.
+	// AttachAssociated: Attach all associated images.
 	// libvips default: false
 	AttachAssociated *bool
-	// Rgb Output RGB (not RGBA).
+	// Rgb: Output RGB (not RGBA).
 	// libvips default: false
 	Rgb *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Openslideload runs the libvips "openslideload" operation: load file with OpenSlide.
 //
 // filename: Filename to load from.
 func Openslideload(filename string, options *OpenslideloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Level != nil {
@@ -9627,6 +10493,9 @@ func Openslideload(filename string, options *OpenslideloadOptions) (*Image, erro
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("openslideload", args...)
 	if err != nil {
@@ -9638,6 +10507,13 @@ func Openslideload(filename string, options *OpenslideloadOptions) (*Image, erro
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9645,40 +10521,46 @@ func Openslideload(filename string, options *OpenslideloadOptions) (*Image, erro
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type OpenslideloadSourceOptions struct {
-	// Level Load this level from the file.
+	// Level: Load this level from the file.
 	// libvips default: 0
 	Level *int
-	// Autocrop Crop to image bounds.
+	// Autocrop: Crop to image bounds.
 	// libvips default: false
 	Autocrop *bool
-	// Associated Load this associated image.
+	// Associated: Load this associated image.
 	Associated *string
-	// AttachAssociated Attach all associated images.
+	// AttachAssociated: Attach all associated images.
 	// libvips default: false
 	AttachAssociated *bool
-	// Rgb Output RGB (not RGBA).
+	// Rgb: Output RGB (not RGBA).
 	// libvips default: false
 	Rgb *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // OpenslideloadSource runs the libvips "openslideload_source" operation: load source with OpenSlide.
 //
 // source: Source to load from.
 func OpenslideloadSource(source *Source, options *OpenslideloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Level != nil {
@@ -9708,6 +10590,9 @@ func OpenslideloadSource(source *Source, options *OpenslideloadSourceOptions) (*
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("openslideload_source", args...)
 	if err != nil {
@@ -9719,6 +10604,13 @@ func OpenslideloadSource(source *Source, options *OpenslideloadSourceOptions) (*
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9726,45 +10618,51 @@ func OpenslideloadSource(source *Source, options *OpenslideloadSourceOptions) (*
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PdfloadOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Dpi DPI to render at.
+	// Dpi: DPI to render at.
 	// libvips default: 72
 	Dpi *float64
-	// Scale Factor to scale by.
+	// Scale: Factor to scale by.
 	// libvips default: 1
 	Scale *float64
-	// Background Background colour.
+	// Background: Background colour.
 	Background *[]float64
-	// Password Password to decrypt with.
+	// Password: Password to decrypt with.
 	Password *string
-	// PageBox The region of the page to render.
-	// libvips default: 1
+	// PageBox: The region of the page to render.
+	// libvips default: crop (1)
 	PageBox *PdfPageBox
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Pdfload runs the libvips "pdfload" operation: load PDF from file (poppler).
 //
 // filename: Filename to load from.
 func Pdfload(filename string, options *PdfloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 12)
+	args := make([]Arg, 0, 13)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Page != nil {
@@ -9800,6 +10698,9 @@ func Pdfload(filename string, options *PdfloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("pdfload", args...)
 	if err != nil {
@@ -9811,6 +10712,13 @@ func Pdfload(filename string, options *PdfloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9818,45 +10726,51 @@ func Pdfload(filename string, options *PdfloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PdfloadBufferOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Dpi DPI to render at.
+	// Dpi: DPI to render at.
 	// libvips default: 72
 	Dpi *float64
-	// Scale Factor to scale by.
+	// Scale: Factor to scale by.
 	// libvips default: 1
 	Scale *float64
-	// Background Background colour.
+	// Background: Background colour.
 	Background *[]float64
-	// Password Password to decrypt with.
+	// Password: Password to decrypt with.
 	Password *string
-	// PageBox The region of the page to render.
-	// libvips default: 1
+	// PageBox: The region of the page to render.
+	// libvips default: crop (1)
 	PageBox *PdfPageBox
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // PdfloadBuffer runs the libvips "pdfload_buffer" operation: load PDF from buffer (poppler).
 //
 // buffer: Buffer to load from.
 func PdfloadBuffer(buffer []byte, options *PdfloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 12)
+	args := make([]Arg, 0, 13)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Page != nil {
@@ -9892,6 +10806,9 @@ func PdfloadBuffer(buffer []byte, options *PdfloadBufferOptions) (*Image, error)
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("pdfload_buffer", args...)
 	if err != nil {
@@ -9903,6 +10820,13 @@ func PdfloadBuffer(buffer []byte, options *PdfloadBufferOptions) (*Image, error)
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -9910,45 +10834,51 @@ func PdfloadBuffer(buffer []byte, options *PdfloadBufferOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PdfloadSourceOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Dpi DPI to render at.
+	// Dpi: DPI to render at.
 	// libvips default: 72
 	Dpi *float64
-	// Scale Factor to scale by.
+	// Scale: Factor to scale by.
 	// libvips default: 1
 	Scale *float64
-	// Background Background colour.
+	// Background: Background colour.
 	Background *[]float64
-	// Password Password to decrypt with.
+	// Password: Password to decrypt with.
 	Password *string
-	// PageBox The region of the page to render.
-	// libvips default: 1
+	// PageBox: The region of the page to render.
+	// libvips default: crop (1)
 	PageBox *PdfPageBox
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // PdfloadSource runs the libvips "pdfload_source" operation: load PDF from source (poppler).
 //
 // source: Source to load from.
 func PdfloadSource(source *Source, options *PdfloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 12)
+	args := make([]Arg, 0, 13)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Page != nil {
@@ -9984,6 +10914,9 @@ func PdfloadSource(source *Source, options *PdfloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("pdfload_source", args...)
 	if err != nil {
@@ -9995,6 +10928,13 @@ func PdfloadSource(source *Source, options *PdfloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -10025,13 +10965,13 @@ func Percent(in *Image, percent float64) (int, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type PerlinOptions struct {
-	// CellSize Size of Perlin cells.
+	// CellSize: Size of Perlin cells.
 	// libvips default: 256
 	CellSize *int
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Seed Random number seed.
+	// Seed: Random number seed.
 	// libvips default: 0
 	Seed *int
 }
@@ -10095,29 +11035,35 @@ func Phasecor(in *Image, in2 *Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PngloadOptions struct {
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Pngload runs the libvips "pngload" operation: load png from file.
 //
 // filename: Filename to load from.
 func Pngload(filename string, options *PngloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Unlimited != nil {
@@ -10135,6 +11081,9 @@ func Pngload(filename string, options *PngloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("pngload", args...)
 	if err != nil {
@@ -10146,6 +11095,13 @@ func Pngload(filename string, options *PngloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -10153,29 +11109,35 @@ func Pngload(filename string, options *PngloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PngloadBufferOptions struct {
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // PngloadBuffer runs the libvips "pngload_buffer" operation: load png from buffer.
 //
 // buffer: Buffer to load from.
 func PngloadBuffer(buffer []byte, options *PngloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Unlimited != nil {
@@ -10193,6 +11155,9 @@ func PngloadBuffer(buffer []byte, options *PngloadBufferOptions) (*Image, error)
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("pngload_buffer", args...)
 	if err != nil {
@@ -10204,6 +11169,13 @@ func PngloadBuffer(buffer []byte, options *PngloadBufferOptions) (*Image, error)
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -10211,29 +11183,35 @@ func PngloadBuffer(buffer []byte, options *PngloadBufferOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PngloadSourceOptions struct {
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // PngloadSource runs the libvips "pngload_source" operation: load png from source.
 //
 // source: Source to load from.
 func PngloadSource(source *Source, options *PngloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Unlimited != nil {
@@ -10251,6 +11229,9 @@ func PngloadSource(source *Source, options *PngloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("pngload_source", args...)
 	if err != nil {
@@ -10262,6 +11243,13 @@ func PngloadSource(source *Source, options *PngloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -10270,39 +11258,39 @@ func PngloadSource(source *Source, options *PngloadSourceOptions) (*Image, error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type PngsaveOptions struct {
-	// Compression Compression factor.
+	// Compression: Compression factor.
 	// libvips default: 6
 	Compression *int
-	// Interlace Interlace image.
+	// Interlace: Interlace image.
 	// libvips default: false
 	Interlace *bool
-	// Filter libpng row filter flag(s).
-	// libvips default: 8
+	// Filter: libpng row filter flag(s).
+	// libvips default: none (8)
 	Filter *PngFilter
-	// Palette Quantise to 8bpp palette.
+	// Palette: Quantise to 8bpp palette.
 	// libvips default: false
 	Palette *bool
-	// Q Quantisation quality.
+	// Q: Quantisation quality.
 	// libvips default: 100
 	Q *int
-	// Dither Amount of dithering.
+	// Dither: Amount of dithering.
 	// libvips default: 1
 	Dither *float64
-	// Bitdepth Write as a 1, 2, 4, 8 or 16 bit image.
+	// Bitdepth: Write as a 1, 2, 4, 8 or 16 bit image.
 	// libvips default: 8
 	Bitdepth *int
-	// Effort Quantisation CPU effort.
+	// Effort: Quantisation CPU effort.
 	// libvips default: 7
 	Effort *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -10366,39 +11354,39 @@ func Pngsave(in *Image, filename string, options *PngsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type PngsaveBufferOptions struct {
-	// Compression Compression factor.
+	// Compression: Compression factor.
 	// libvips default: 6
 	Compression *int
-	// Interlace Interlace image.
+	// Interlace: Interlace image.
 	// libvips default: false
 	Interlace *bool
-	// Filter libpng row filter flag(s).
-	// libvips default: 8
+	// Filter: libpng row filter flag(s).
+	// libvips default: none (8)
 	Filter *PngFilter
-	// Palette Quantise to 8bpp palette.
+	// Palette: Quantise to 8bpp palette.
 	// libvips default: false
 	Palette *bool
-	// Q Quantisation quality.
+	// Q: Quantisation quality.
 	// libvips default: 100
 	Q *int
-	// Dither Amount of dithering.
+	// Dither: Amount of dithering.
 	// libvips default: 1
 	Dither *float64
-	// Bitdepth Write as a 1, 2, 4, 8 or 16 bit image.
+	// Bitdepth: Write as a 1, 2, 4, 8 or 16 bit image.
 	// libvips default: 8
 	Bitdepth *int
-	// Effort Quantisation CPU effort.
+	// Effort: Quantisation CPU effort.
 	// libvips default: 7
 	Effort *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -10464,39 +11452,39 @@ func PngsaveBuffer(in *Image, options *PngsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type PngsaveTargetOptions struct {
-	// Compression Compression factor.
+	// Compression: Compression factor.
 	// libvips default: 6
 	Compression *int
-	// Interlace Interlace image.
+	// Interlace: Interlace image.
 	// libvips default: false
 	Interlace *bool
-	// Filter libpng row filter flag(s).
-	// libvips default: 8
+	// Filter: libpng row filter flag(s).
+	// libvips default: none (8)
 	Filter *PngFilter
-	// Palette Quantise to 8bpp palette.
+	// Palette: Quantise to 8bpp palette.
 	// libvips default: false
 	Palette *bool
-	// Q Quantisation quality.
+	// Q: Quantisation quality.
 	// libvips default: 100
 	Q *int
-	// Dither Amount of dithering.
+	// Dither: Amount of dithering.
 	// libvips default: 1
 	Dither *float64
-	// Bitdepth Write as a 1, 2, 4, 8 or 16 bit image.
+	// Bitdepth: Write as a 1, 2, 4, 8 or 16 bit image.
 	// libvips default: 8
 	Bitdepth *int
-	// Effort Quantisation CPU effort.
+	// Effort: Quantisation CPU effort.
 	// libvips default: 7
 	Effort *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -10559,26 +11547,32 @@ func PngsaveTarget(in *Image, target *Target, options *PngsaveTargetOptions) err
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PpmloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Ppmload runs the libvips "ppmload" operation: load ppm from file.
 //
 // filename: Filename to load from.
 func Ppmload(filename string, options *PpmloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -10593,6 +11587,9 @@ func Ppmload(filename string, options *PpmloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("ppmload", args...)
 	if err != nil {
@@ -10604,6 +11601,13 @@ func Ppmload(filename string, options *PpmloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -10611,26 +11615,32 @@ func Ppmload(filename string, options *PpmloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PpmloadBufferOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // PpmloadBuffer runs the libvips "ppmload_buffer" operation: load ppm from buffer.
 //
 // buffer: Buffer to load from.
 func PpmloadBuffer(buffer []byte, options *PpmloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Memory != nil {
@@ -10645,6 +11655,9 @@ func PpmloadBuffer(buffer []byte, options *PpmloadBufferOptions) (*Image, error)
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("ppmload_buffer", args...)
 	if err != nil {
@@ -10656,6 +11669,13 @@ func PpmloadBuffer(buffer []byte, options *PpmloadBufferOptions) (*Image, error)
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -10663,26 +11683,32 @@ func PpmloadBuffer(buffer []byte, options *PpmloadBufferOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type PpmloadSourceOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // PpmloadSource runs the libvips "ppmload_source" operation: load ppm from source.
 //
 // source: Source to load from.
 func PpmloadSource(source *Source, options *PpmloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Memory != nil {
@@ -10697,6 +11723,9 @@ func PpmloadSource(source *Source, options *PpmloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("ppmload_source", args...)
 	if err != nil {
@@ -10708,6 +11737,13 @@ func PpmloadSource(source *Source, options *PpmloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -10716,24 +11752,24 @@ func PpmloadSource(source *Source, options *PpmloadSourceOptions) (*Image, error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type PpmsaveOptions struct {
-	// Format Format to save in.
-	// libvips default: 2
+	// Format: Format to save in.
+	// libvips default: ppm (2)
 	Format *PpmFormat
-	// Ascii Save as ascii.
+	// Ascii: Save as ascii.
 	// libvips default: false
 	Ascii *bool
-	// Bitdepth Set to 1 to write as a 1 bit image.
+	// Bitdepth: Set to 1 to write as a 1 bit image.
 	// libvips default: 0
 	Bitdepth *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -10782,24 +11818,24 @@ func Ppmsave(in *Image, filename string, options *PpmsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type PpmsaveTargetOptions struct {
-	// Format Format to save in.
-	// libvips default: 2
+	// Format: Format to save in.
+	// libvips default: ppm (2)
 	Format *PpmFormat
-	// Ascii Save as ascii.
+	// Ascii: Save as ascii.
 	// libvips default: false
 	Ascii *bool
-	// Bitdepth Set to 1 to write as a 1 bit image.
+	// Bitdepth: Set to 1 to write as a 1 bit image.
 	// libvips default: 0
 	Bitdepth *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -10848,7 +11884,7 @@ func PpmsaveTarget(in *Image, target *Target, options *PpmsaveTargetOptions) err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type PremultiplyOptions struct {
-	// MaxAlpha Maximum value of alpha channel.
+	// MaxAlpha: Maximum value of alpha channel.
 	// libvips default: 255
 	MaxAlpha *float64
 }
@@ -10970,8 +12006,8 @@ func Project(in *Image) (*Image, *Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type QuadraticOptions struct {
-	// Interpolate Interpolate values with this.
-	Interpolate **Interpolate
+	// Interpolate: Interpolate values with this.
+	Interpolate *Interpolate
 }
 
 // Quadratic runs the libvips "quadratic" operation: resample an image with a quadratic transform.
@@ -10985,7 +12021,7 @@ func Quadratic(in *Image, coeff *Image, options *QuadraticOptions) (*Image, erro
 	args = append(args, In("coeff", coeff))
 	if options != nil {
 		if options.Interpolate != nil {
-			args = append(args, In("interpolate", *options.Interpolate))
+			args = append(args, In("interpolate", options.Interpolate))
 		}
 	}
 	outs, err := Call("quadratic", args...)
@@ -11024,26 +12060,32 @@ func Rad2float(in *Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type RadloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Radload runs the libvips "radload" operation: load a Radiance image from a file.
 //
 // filename: Filename to load from.
 func Radload(filename string, options *RadloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -11058,6 +12100,9 @@ func Radload(filename string, options *RadloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("radload", args...)
 	if err != nil {
@@ -11069,6 +12114,13 @@ func Radload(filename string, options *RadloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -11076,26 +12128,32 @@ func Radload(filename string, options *RadloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type RadloadBufferOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // RadloadBuffer runs the libvips "radload_buffer" operation: load rad from buffer.
 //
 // buffer: Buffer to load from.
 func RadloadBuffer(buffer []byte, options *RadloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Memory != nil {
@@ -11110,6 +12168,9 @@ func RadloadBuffer(buffer []byte, options *RadloadBufferOptions) (*Image, error)
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("radload_buffer", args...)
 	if err != nil {
@@ -11121,6 +12182,13 @@ func RadloadBuffer(buffer []byte, options *RadloadBufferOptions) (*Image, error)
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -11128,26 +12196,32 @@ func RadloadBuffer(buffer []byte, options *RadloadBufferOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type RadloadSourceOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // RadloadSource runs the libvips "radload_source" operation: load rad from source.
 //
 // source: Source to load from.
 func RadloadSource(source *Source, options *RadloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Memory != nil {
@@ -11162,6 +12236,9 @@ func RadloadSource(source *Source, options *RadloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("radload_source", args...)
 	if err != nil {
@@ -11173,6 +12250,13 @@ func RadloadSource(source *Source, options *RadloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -11181,15 +12265,15 @@ func RadloadSource(source *Source, options *RadloadSourceOptions) (*Image, error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type RadsaveOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -11229,15 +12313,15 @@ func Radsave(in *Image, filename string, options *RadsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type RadsaveBufferOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -11279,15 +12363,15 @@ func RadsaveBuffer(in *Image, options *RadsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type RadsaveTargetOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -11354,28 +12438,34 @@ func Rank(in *Image, width int, height int, index int) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type RawloadOptions struct {
-	// Offset Offset in bytes from start of file.
+	// Offset: Offset in bytes from start of file.
 	// libvips default: 0
 	Offset *int64
-	// Format Pixel format in image.
-	// libvips default: 0
+	// Format: Pixel format in image.
+	// libvips default: uchar (0)
 	Format *BandFormat
-	// Interpretation Pixel interpretation.
-	// libvips default: 0
+	// Interpretation: Pixel interpretation.
+	// libvips default: multiband (0)
 	Interpretation *Interpretation
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Rawload runs the libvips "rawload" operation: load raw data from a file.
@@ -11388,7 +12478,7 @@ type RawloadOptions struct {
 //
 // bands: Number of bands in image.
 func Rawload(filename string, width int, height int, bands int, options *RawloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 11)
+	args := make([]Arg, 0, 12)
 	args = append(args, In("filename", filename))
 	args = append(args, In("width", width))
 	args = append(args, In("height", height))
@@ -11415,6 +12505,9 @@ func Rawload(filename string, width int, height int, bands int, options *Rawload
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("rawload", args...)
 	if err != nil {
@@ -11426,6 +12519,13 @@ func Rawload(filename string, width int, height int, bands int, options *Rawload
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -11434,15 +12534,15 @@ func Rawload(filename string, width int, height int, bands int, options *Rawload
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type RawsaveOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -11482,15 +12582,15 @@ func Rawsave(in *Image, filename string, options *RawsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type RawsaveBufferOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -11532,15 +12632,15 @@ func RawsaveBuffer(in *Image, options *RawsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type RawsaveTargetOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -11602,10 +12702,10 @@ func Recomb(in *Image, m *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ReduceOptions struct {
-	// Kernel Resampling kernel.
-	// libvips default: 5
+	// Kernel: Resampling kernel.
+	// libvips default: lanczos3 (5)
 	Kernel *Kernel
-	// Gap Reducing gap.
+	// Gap: Reducing gap.
 	// libvips default: 0
 	Gap *float64
 }
@@ -11648,10 +12748,10 @@ func Reduce(in *Image, hshrink float64, vshrink float64, options *ReduceOptions)
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ReducehOptions struct {
-	// Kernel Resampling kernel.
-	// libvips default: 5
+	// Kernel: Resampling kernel.
+	// libvips default: lanczos3 (5)
 	Kernel *Kernel
-	// Gap Reducing gap.
+	// Gap: Reducing gap.
 	// libvips default: 0
 	Gap *float64
 }
@@ -11691,10 +12791,10 @@ func Reduceh(in *Image, hshrink float64, options *ReducehOptions) (*Image, error
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ReducevOptions struct {
-	// Kernel Resampling kernel.
-	// libvips default: 5
+	// Kernel: Resampling kernel.
+	// libvips default: lanczos3 (5)
 	Kernel *Kernel
-	// Gap Reducing gap.
+	// Gap: Reducing gap.
 	// libvips default: 0
 	Gap *float64
 }
@@ -11878,13 +12978,13 @@ func Replicate(in *Image, across int, down int) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ResizeOptions struct {
-	// Kernel Resampling kernel.
-	// libvips default: 5
+	// Kernel: Resampling kernel.
+	// libvips default: lanczos3 (5)
 	Kernel *Kernel
-	// Gap Reducing gap.
+	// Gap: Reducing gap.
 	// libvips default: 2
 	Gap *float64
-	// Vscale Vertical scale image by this factor.
+	// Vscale: Vertical scale image by this factor.
 	// libvips default: 0
 	Vscale *float64
 }
@@ -11949,8 +13049,8 @@ func Rot(in *Image, angle Angle) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Rot45Options struct {
-	// Angle Angle to rotate image.
-	// libvips default: 1
+	// Angle: Angle to rotate image.
+	// libvips default: d45 (1)
 	Angle *Angle45
 }
 
@@ -11983,20 +13083,20 @@ func Rot45(in *Image, options *Rot45Options) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type RotateOptions struct {
-	// Interpolate Interpolate pixels with this.
-	Interpolate **Interpolate
-	// Background Background value.
+	// Interpolate: Interpolate pixels with this.
+	Interpolate *Interpolate
+	// Background: Background value.
 	Background *[]float64
-	// Odx Horizontal output displacement.
+	// Odx: Horizontal output displacement.
 	// libvips default: 0
 	Odx *float64
-	// Ody Vertical output displacement.
+	// Ody: Vertical output displacement.
 	// libvips default: 0
 	Ody *float64
-	// Idx Horizontal input displacement.
+	// Idx: Horizontal input displacement.
 	// libvips default: 0
 	Idx *float64
-	// Idy Vertical input displacement.
+	// Idy: Vertical input displacement.
 	// libvips default: 0
 	Idy *float64
 }
@@ -12012,7 +13112,7 @@ func Rotate(in *Image, angle float64, options *RotateOptions) (*Image, error) {
 	args = append(args, In("angle", angle))
 	if options != nil {
 		if options.Interpolate != nil {
-			args = append(args, In("interpolate", *options.Interpolate))
+			args = append(args, In("interpolate", options.Interpolate))
 		}
 		if options.Background != nil {
 			args = append(args, In("background", *options.Background))
@@ -12108,7 +13208,7 @@ func SRGB2scRGB(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ScRGB2BWOptions struct {
-	// Depth Output device space depth in bits.
+	// Depth: Output device space depth in bits.
 	// libvips default: 8
 	Depth *int
 }
@@ -12161,7 +13261,7 @@ func ScRGB2XYZ(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ScRGB2sRGBOptions struct {
-	// Depth Output device space depth in bits.
+	// Depth: Output device space depth in bits.
 	// libvips default: 8
 	Depth *int
 }
@@ -12195,10 +13295,10 @@ func ScRGB2sRGB(in *Image, options *ScRGB2sRGBOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ScaleOptions struct {
-	// Exp Exponent for log scale.
+	// Exp: Exponent for log scale.
 	// libvips default: 0.25
 	Exp *float64
-	// Log Log scale.
+	// Log: Log scale.
 	// libvips default: false
 	Log *bool
 }
@@ -12254,14 +13354,14 @@ func Scharr(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type SdfOptions struct {
-	// R Radius.
+	// R: Radius.
 	// libvips default: 50
 	R *float64
-	// A Point a.
+	// A: Point a.
 	A *[]float64
-	// B Point b.
+	// B: Point b.
 	B *[]float64
-	// Corners Corner radii.
+	// Corners: Corner radii.
 	Corners *[]float64
 }
 
@@ -12309,7 +13409,7 @@ func Sdf(width int, height int, shape SdfShape, options *SdfOptions) (*Image, er
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type SequentialOptions struct {
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 1
 	TileHeight *int
 }
@@ -12343,22 +13443,22 @@ func Sequential(in *Image, options *SequentialOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type SharpenOptions struct {
-	// Sigma Sigma of Gaussian.
+	// Sigma: Sigma of Gaussian.
 	// libvips default: 0.5
 	Sigma *float64
-	// X1 Flat/jaggy threshold.
+	// X1: Flat/jaggy threshold.
 	// libvips default: 2
 	X1 *float64
-	// Y2 Maximum brightening.
+	// Y2: Maximum brightening.
 	// libvips default: 10
 	Y2 *float64
-	// Y3 Maximum darkening.
+	// Y3: Maximum darkening.
 	// libvips default: 20
 	Y3 *float64
-	// M1 Slope for flat areas.
+	// M1: Slope for flat areas.
 	// libvips default: 0
 	M1 *float64
-	// M2 Slope for jaggy areas.
+	// M2: Slope for jaggy areas.
 	// libvips default: 3
 	M2 *float64
 }
@@ -12407,7 +13507,7 @@ func Sharpen(in *Image, options *SharpenOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ShrinkOptions struct {
-	// Ceil Round-up output dimensions.
+	// Ceil: Round-up output dimensions.
 	// libvips default: false
 	Ceil *bool
 }
@@ -12447,7 +13547,7 @@ func Shrink(in *Image, hshrink float64, vshrink float64, options *ShrinkOptions)
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ShrinkhOptions struct {
-	// Ceil Round-up output dimensions.
+	// Ceil: Round-up output dimensions.
 	// libvips default: false
 	Ceil *bool
 }
@@ -12484,7 +13584,7 @@ func Shrinkh(in *Image, hshrink int, options *ShrinkhOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ShrinkvOptions struct {
-	// Ceil Round-up output dimensions.
+	// Ceil: Round-up output dimensions.
 	// libvips default: false
 	Ceil *bool
 }
@@ -12540,26 +13640,26 @@ func Sign(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type SimilarityOptions struct {
-	// Scale Scale by this factor.
+	// Scale: Scale by this factor.
 	// libvips default: 1
 	Scale *float64
-	// Angle Rotate clockwise by this many degrees.
+	// Angle: Rotate clockwise by this many degrees.
 	// libvips default: 0
 	Angle *float64
-	// Interpolate Interpolate pixels with this.
-	Interpolate **Interpolate
-	// Background Background value.
+	// Interpolate: Interpolate pixels with this.
+	Interpolate *Interpolate
+	// Background: Background value.
 	Background *[]float64
-	// Odx Horizontal output displacement.
+	// Odx: Horizontal output displacement.
 	// libvips default: 0
 	Odx *float64
-	// Ody Vertical output displacement.
+	// Ody: Vertical output displacement.
 	// libvips default: 0
 	Ody *float64
-	// Idx Horizontal input displacement.
+	// Idx: Horizontal input displacement.
 	// libvips default: 0
 	Idx *float64
-	// Idy Vertical input displacement.
+	// Idy: Vertical input displacement.
 	// libvips default: 0
 	Idy *float64
 }
@@ -12578,7 +13678,7 @@ func Similarity(in *Image, options *SimilarityOptions) (*Image, error) {
 			args = append(args, In("angle", *options.Angle))
 		}
 		if options.Interpolate != nil {
-			args = append(args, In("interpolate", *options.Interpolate))
+			args = append(args, In("interpolate", options.Interpolate))
 		}
 		if options.Background != nil {
 			args = append(args, In("background", *options.Background))
@@ -12614,13 +13714,13 @@ func Similarity(in *Image, options *SimilarityOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type SinesOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
-	// Hfreq Horizontal spatial frequency.
+	// Hfreq: Horizontal spatial frequency.
 	// libvips default: 0.5
 	Hfreq *float64
-	// Vfreq Vertical spatial frequency.
+	// Vfreq: Vertical spatial frequency.
 	// libvips default: 0.5
 	Vfreq *float64
 }
@@ -12662,13 +13762,21 @@ func Sines(width int, height int, options *SinesOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type SmartcropOptions struct {
-	// Interesting How to measure interestingness.
-	// libvips default: 3
+	// Interesting: How to measure interestingness.
+	// libvips default: attention (3)
 	Interesting *Interesting
-	// Premultiplied Input image already has premultiplied alpha.
+	// Premultiplied: Input image already has premultiplied alpha.
 	// libvips default: false
 	Premultiplied *bool
+	// AttentionX: output — Horizontal position of attention centre.
+	AttentionX *int
+	// AttentionY: output — Vertical position of attention centre.
+	AttentionY *int
 }
 
 // Smartcrop runs the libvips "smartcrop" operation: extract an area from an image.
@@ -12679,7 +13787,7 @@ type SmartcropOptions struct {
 //
 // height: Height of extract area.
 func Smartcrop(input *Image, width int, height int, options *SmartcropOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("input", input))
 	args = append(args, In("width", width))
 	args = append(args, In("height", height))
@@ -12689,6 +13797,12 @@ func Smartcrop(input *Image, width int, height int, options *SmartcropOptions) (
 		}
 		if options.Premultiplied != nil {
 			args = append(args, In("premultiplied", *options.Premultiplied))
+		}
+		if options.AttentionX != nil {
+			args = append(args, Out("attention-x"))
+		}
+		if options.AttentionY != nil {
+			args = append(args, Out("attention-y"))
 		}
 	}
 	outs, err := Call("smartcrop", args...)
@@ -12701,6 +13815,18 @@ func Smartcrop(input *Image, width int, height int, options *SmartcropOptions) (
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.AttentionX != nil {
+			if v, err := outs.Int("attention-x"); err == nil {
+				*options.AttentionX = v
+			}
+		}
+		if options.AttentionY != nil {
+			if v, err := outs.Int("attention-y"); err == nil {
+				*options.AttentionY = v
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -12788,16 +13914,16 @@ func Stats(in *Image) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type StdifOptions struct {
-	// S0 New deviation.
+	// S0: New deviation.
 	// libvips default: 50
 	S0 *float64
-	// B Weight of new deviation.
+	// B: Weight of new deviation.
 	// libvips default: 0.5
 	B *float64
-	// M0 New mean.
+	// M0: New mean.
 	// libvips default: 128
 	M0 *float64
-	// A Weight of new mean.
+	// A: Weight of new mean.
 	// libvips default: 0.5
 	A *float64
 }
@@ -12846,7 +13972,7 @@ func Stdif(in *Image, width int, height int, options *StdifOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type SubsampleOptions struct {
-	// Point Point sample.
+	// Point: Point sample.
 	// libvips default: false
 	Point *bool
 }
@@ -12926,40 +14052,46 @@ func Sum(in []*Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type SvgloadOptions struct {
-	// Dpi Render at this DPI.
+	// Dpi: Render at this DPI.
 	// libvips default: 72
 	Dpi *float64
-	// Scale Scale output by this factor.
+	// Scale: Scale output by this factor.
 	// libvips default: 1
 	Scale *float64
-	// Unlimited Allow SVG of any size.
+	// Unlimited: Allow SVG of any size.
 	// libvips default: false
 	Unlimited *bool
-	// Stylesheet Custom CSS.
+	// Stylesheet: Custom CSS.
 	Stylesheet *string
-	// HighBitdepth Enable scRGB 128-bit output (32-bit per channel).
+	// HighBitdepth: Enable scRGB 128-bit output (32-bit per channel).
 	// libvips default: false
 	HighBitdepth *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Svgload runs the libvips "svgload" operation: load SVG with rsvg.
 //
 // filename: Filename to load from.
 func Svgload(filename string, options *SvgloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Dpi != nil {
@@ -12989,6 +14121,9 @@ func Svgload(filename string, options *SvgloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("svgload", args...)
 	if err != nil {
@@ -13000,6 +14135,13 @@ func Svgload(filename string, options *SvgloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -13007,40 +14149,46 @@ func Svgload(filename string, options *SvgloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type SvgloadBufferOptions struct {
-	// Dpi Render at this DPI.
+	// Dpi: Render at this DPI.
 	// libvips default: 72
 	Dpi *float64
-	// Scale Scale output by this factor.
+	// Scale: Scale output by this factor.
 	// libvips default: 1
 	Scale *float64
-	// Unlimited Allow SVG of any size.
+	// Unlimited: Allow SVG of any size.
 	// libvips default: false
 	Unlimited *bool
-	// Stylesheet Custom CSS.
+	// Stylesheet: Custom CSS.
 	Stylesheet *string
-	// HighBitdepth Enable scRGB 128-bit output (32-bit per channel).
+	// HighBitdepth: Enable scRGB 128-bit output (32-bit per channel).
 	// libvips default: false
 	HighBitdepth *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // SvgloadBuffer runs the libvips "svgload_buffer" operation: load SVG with rsvg.
 //
 // buffer: Buffer to load from.
 func SvgloadBuffer(buffer []byte, options *SvgloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Dpi != nil {
@@ -13070,6 +14218,9 @@ func SvgloadBuffer(buffer []byte, options *SvgloadBufferOptions) (*Image, error)
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("svgload_buffer", args...)
 	if err != nil {
@@ -13081,6 +14232,13 @@ func SvgloadBuffer(buffer []byte, options *SvgloadBufferOptions) (*Image, error)
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -13088,40 +14246,46 @@ func SvgloadBuffer(buffer []byte, options *SvgloadBufferOptions) (*Image, error)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type SvgloadSourceOptions struct {
-	// Dpi Render at this DPI.
+	// Dpi: Render at this DPI.
 	// libvips default: 72
 	Dpi *float64
-	// Scale Scale output by this factor.
+	// Scale: Scale output by this factor.
 	// libvips default: 1
 	Scale *float64
-	// Unlimited Allow SVG of any size.
+	// Unlimited: Allow SVG of any size.
 	// libvips default: false
 	Unlimited *bool
-	// Stylesheet Custom CSS.
+	// Stylesheet: Custom CSS.
 	Stylesheet *string
-	// HighBitdepth Enable scRGB 128-bit output (32-bit per channel).
+	// HighBitdepth: Enable scRGB 128-bit output (32-bit per channel).
 	// libvips default: false
 	HighBitdepth *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // SvgloadSource runs the libvips "svgload_source" operation: load svg from source.
 //
 // source: Source to load from.
 func SvgloadSource(source *Source, options *SvgloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Dpi != nil {
@@ -13151,6 +14315,9 @@ func SvgloadSource(source *Source, options *SvgloadSourceOptions) (*Image, error
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("svgload_source", args...)
 	if err != nil {
@@ -13162,6 +14329,13 @@ func SvgloadSource(source *Source, options *SvgloadSourceOptions) (*Image, error
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -13188,23 +14362,31 @@ func Switch(tests []*Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type SystemOptions struct {
-	// In Array of input images.
+	// In: Array of input images.
 	In *[]*Image
-	// InFormat Format for input filename.
+	// InFormat: Format for input filename.
 	InFormat *string
-	// OutFormat Format for output filename.
+	// OutFormat: Format for output filename.
 	OutFormat *string
-	// Cache Cache this call.
+	// Cache: Cache this call.
 	// libvips default: false
 	Cache *bool
+	// Out: output — Output image.
+	Out **Image
+	// Log: output — Command log.
+	Log *string
 }
 
 // System runs the libvips "system" operation: run an external command.
 //
 // cmdFormat: Command to run.
 func System(cmdFormat string, options *SystemOptions) error {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("cmd-format", cmdFormat))
 	if options != nil {
 		if options.In != nil {
@@ -13219,10 +14401,29 @@ func System(cmdFormat string, options *SystemOptions) error {
 		if options.Cache != nil {
 			args = append(args, In("cache", *options.Cache))
 		}
+		if options.Out != nil {
+			args = append(args, Out("out"))
+		}
+		if options.Log != nil {
+			args = append(args, Out("log"))
+		}
 	}
 	outs, err := Call("system", args...)
 	if err != nil {
 		return err
+	}
+	if options != nil {
+		if options.Out != nil {
+			if v, err := outs.Image("out"); err == nil {
+				*options.Out = v
+				delete(outs, "out")
+			}
+		}
+		if options.Log != nil {
+			if v, err := outs.String("log"); err == nil {
+				*options.Log = v
+			}
+		}
 	}
 	outs.Close()
 	return nil
@@ -13232,42 +14433,48 @@ func System(cmdFormat string, options *SystemOptions) error {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type TextOptions struct {
-	// Font Font to render with.
+	// Font: Font to render with.
 	Font *string
-	// Width Maximum image width in pixels.
+	// Width: Maximum image width in pixels.
 	// libvips default: 0
 	Width *int
-	// Height Maximum image height in pixels.
+	// Height: Maximum image height in pixels.
 	// libvips default: 0
 	Height *int
-	// Align Align on the low, centre or high edge.
-	// libvips default: 0
+	// Align: Align on the low, centre or high edge.
+	// libvips default: low (0)
 	Align *Align
-	// Justify Justify lines.
+	// Justify: Justify lines.
 	// libvips default: false
 	Justify *bool
-	// Dpi DPI to render at.
+	// Dpi: DPI to render at.
 	// libvips default: 72
 	Dpi *int
-	// Spacing Line spacing.
+	// Spacing: Line spacing.
 	// libvips default: 0
 	Spacing *int
-	// Fontfile Load this font file.
+	// Fontfile: Load this font file.
 	Fontfile *string
-	// Rgba Enable RGBA output.
+	// Rgba: Enable RGBA output.
 	// libvips default: false
 	Rgba *bool
-	// Wrap Wrap lines on word or character boundaries.
-	// libvips default: 0
+	// Wrap: Wrap lines on word or character boundaries.
+	// libvips default: word (0)
 	Wrap *TextWrap
+	// AutofitDpi: output — DPI selected by autofit.
+	AutofitDpi *int
 }
 
 // Text runs the libvips "text" operation: make a text image.
 //
 // text: Text to render.
 func Text(text string, options *TextOptions) (*Image, error) {
-	args := make([]Arg, 0, 11)
+	args := make([]Arg, 0, 12)
 	args = append(args, In("text", text))
 	if options != nil {
 		if options.Font != nil {
@@ -13300,6 +14507,9 @@ func Text(text string, options *TextOptions) (*Image, error) {
 		if options.Wrap != nil {
 			args = append(args, In("wrap", int(*options.Wrap)))
 		}
+		if options.AutofitDpi != nil {
+			args = append(args, Out("autofit-dpi"))
+		}
 	}
 	outs, err := Call("text", args...)
 	if err != nil {
@@ -13311,6 +14521,13 @@ func Text(text string, options *TextOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.AutofitDpi != nil {
+			if v, err := outs.Int("autofit-dpi"); err == nil {
+				*options.AutofitDpi = v
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -13319,30 +14536,30 @@ func Text(text string, options *TextOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ThumbnailOptions struct {
-	// Height Size to this height.
+	// Height: Size to this height.
 	// libvips default: 1
 	Height *int
-	// Size Only upsize, only downsize, or both.
-	// libvips default: 0
+	// Size: Only upsize, only downsize, or both.
+	// libvips default: both (0)
 	Size *Size
-	// NoRotate Don't use orientation tags to rotate image upright.
+	// NoRotate: Don't use orientation tags to rotate image upright.
 	// libvips default: false
 	NoRotate *bool
-	// Crop Reduce to fill target rectangle, then crop.
-	// libvips default: 0
+	// Crop: Reduce to fill target rectangle, then crop.
+	// libvips default: none (0)
 	Crop *Interesting
-	// Linear Reduce in linear light.
+	// Linear: Reduce in linear light.
 	// libvips default: false
 	Linear *bool
-	// InputProfile Fallback input profile.
+	// InputProfile: Fallback input profile.
 	InputProfile *string
-	// OutputProfile Fallback output profile.
+	// OutputProfile: Fallback output profile.
 	OutputProfile *string
-	// Intent Rendering intent.
-	// libvips default: 1
+	// Intent: Rendering intent.
+	// libvips default: relative (1)
 	Intent *Intent
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
 }
 
@@ -13402,32 +14619,32 @@ func Thumbnail(filename string, width int, options *ThumbnailOptions) (*Image, e
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ThumbnailBufferOptions struct {
-	// OptionString Options that are passed on to the underlying loader.
+	// OptionString: Options that are passed on to the underlying loader.
 	OptionString *string
-	// Height Size to this height.
+	// Height: Size to this height.
 	// libvips default: 1
 	Height *int
-	// Size Only upsize, only downsize, or both.
-	// libvips default: 0
+	// Size: Only upsize, only downsize, or both.
+	// libvips default: both (0)
 	Size *Size
-	// NoRotate Don't use orientation tags to rotate image upright.
+	// NoRotate: Don't use orientation tags to rotate image upright.
 	// libvips default: false
 	NoRotate *bool
-	// Crop Reduce to fill target rectangle, then crop.
-	// libvips default: 0
+	// Crop: Reduce to fill target rectangle, then crop.
+	// libvips default: none (0)
 	Crop *Interesting
-	// Linear Reduce in linear light.
+	// Linear: Reduce in linear light.
 	// libvips default: false
 	Linear *bool
-	// InputProfile Fallback input profile.
+	// InputProfile: Fallback input profile.
 	InputProfile *string
-	// OutputProfile Fallback output profile.
+	// OutputProfile: Fallback output profile.
 	OutputProfile *string
-	// Intent Rendering intent.
-	// libvips default: 1
+	// Intent: Rendering intent.
+	// libvips default: relative (1)
 	Intent *Intent
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
 }
 
@@ -13490,30 +14707,30 @@ func ThumbnailBuffer(buffer []byte, width int, options *ThumbnailBufferOptions) 
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ThumbnailImageOptions struct {
-	// Height Size to this height.
+	// Height: Size to this height.
 	// libvips default: 1
 	Height *int
-	// Size Only upsize, only downsize, or both.
-	// libvips default: 0
+	// Size: Only upsize, only downsize, or both.
+	// libvips default: both (0)
 	Size *Size
-	// NoRotate Don't use orientation tags to rotate image upright.
+	// NoRotate: Don't use orientation tags to rotate image upright.
 	// libvips default: false
 	NoRotate *bool
-	// Crop Reduce to fill target rectangle, then crop.
-	// libvips default: 0
+	// Crop: Reduce to fill target rectangle, then crop.
+	// libvips default: none (0)
 	Crop *Interesting
-	// Linear Reduce in linear light.
+	// Linear: Reduce in linear light.
 	// libvips default: false
 	Linear *bool
-	// InputProfile Fallback input profile.
+	// InputProfile: Fallback input profile.
 	InputProfile *string
-	// OutputProfile Fallback output profile.
+	// OutputProfile: Fallback output profile.
 	OutputProfile *string
-	// Intent Rendering intent.
-	// libvips default: 1
+	// Intent: Rendering intent.
+	// libvips default: relative (1)
 	Intent *Intent
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
 }
 
@@ -13573,32 +14790,32 @@ func ThumbnailImage(in *Image, width int, options *ThumbnailImageOptions) (*Imag
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ThumbnailSourceOptions struct {
-	// OptionString Options that are passed on to the underlying loader.
+	// OptionString: Options that are passed on to the underlying loader.
 	OptionString *string
-	// Height Size to this height.
+	// Height: Size to this height.
 	// libvips default: 1
 	Height *int
-	// Size Only upsize, only downsize, or both.
-	// libvips default: 0
+	// Size: Only upsize, only downsize, or both.
+	// libvips default: both (0)
 	Size *Size
-	// NoRotate Don't use orientation tags to rotate image upright.
+	// NoRotate: Don't use orientation tags to rotate image upright.
 	// libvips default: false
 	NoRotate *bool
-	// Crop Reduce to fill target rectangle, then crop.
-	// libvips default: 0
+	// Crop: Reduce to fill target rectangle, then crop.
+	// libvips default: none (0)
 	Crop *Interesting
-	// Linear Reduce in linear light.
+	// Linear: Reduce in linear light.
 	// libvips default: false
 	Linear *bool
-	// InputProfile Fallback input profile.
+	// InputProfile: Fallback input profile.
 	InputProfile *string
-	// OutputProfile Fallback output profile.
+	// OutputProfile: Fallback output profile.
 	OutputProfile *string
-	// Intent Rendering intent.
-	// libvips default: 1
+	// Intent: Rendering intent.
+	// libvips default: relative (1)
 	Intent *Intent
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
 }
 
@@ -13660,41 +14877,47 @@ func ThumbnailSource(source *Source, width int, options *ThumbnailSourceOptions)
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type TiffloadOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Autorotate Rotate image using orientation tag.
+	// Autorotate: Rotate image using orientation tag.
 	// libvips default: false
 	Autorotate *bool
-	// Subifd Subifd index.
+	// Subifd: Subifd index.
 	// libvips default: -1
 	Subifd *int
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Tiffload runs the libvips "tiffload" operation: load tiff from file.
 //
 // filename: Filename to load from.
 func Tiffload(filename string, options *TiffloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Page != nil {
@@ -13724,6 +14947,9 @@ func Tiffload(filename string, options *TiffloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("tiffload", args...)
 	if err != nil {
@@ -13735,6 +14961,13 @@ func Tiffload(filename string, options *TiffloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -13742,41 +14975,47 @@ func Tiffload(filename string, options *TiffloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type TiffloadBufferOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Autorotate Rotate image using orientation tag.
+	// Autorotate: Rotate image using orientation tag.
 	// libvips default: false
 	Autorotate *bool
-	// Subifd Subifd index.
+	// Subifd: Subifd index.
 	// libvips default: -1
 	Subifd *int
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // TiffloadBuffer runs the libvips "tiffload_buffer" operation: load tiff from buffer.
 //
 // buffer: Buffer to load from.
 func TiffloadBuffer(buffer []byte, options *TiffloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Page != nil {
@@ -13806,6 +15045,9 @@ func TiffloadBuffer(buffer []byte, options *TiffloadBufferOptions) (*Image, erro
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("tiffload_buffer", args...)
 	if err != nil {
@@ -13817,6 +15059,13 @@ func TiffloadBuffer(buffer []byte, options *TiffloadBufferOptions) (*Image, erro
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -13824,41 +15073,47 @@ func TiffloadBuffer(buffer []byte, options *TiffloadBufferOptions) (*Image, erro
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type TiffloadSourceOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Autorotate Rotate image using orientation tag.
+	// Autorotate: Rotate image using orientation tag.
 	// libvips default: false
 	Autorotate *bool
-	// Subifd Subifd index.
+	// Subifd: Subifd index.
 	// libvips default: -1
 	Subifd *int
-	// Unlimited Remove all denial of service limits.
+	// Unlimited: Remove all denial of service limits.
 	// libvips default: false
 	Unlimited *bool
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // TiffloadSource runs the libvips "tiffload_source" operation: load tiff from source.
 //
 // source: Source to load from.
 func TiffloadSource(source *Source, options *TiffloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 10)
+	args := make([]Arg, 0, 11)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Page != nil {
@@ -13888,6 +15143,9 @@ func TiffloadSource(source *Source, options *TiffloadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("tiffload_source", args...)
 	if err != nil {
@@ -13899,6 +15157,13 @@ func TiffloadSource(source *Source, options *TiffloadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -13907,75 +15172,75 @@ func TiffloadSource(source *Source, options *TiffloadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type TiffsaveOptions struct {
-	// Compression Compression for this file.
-	// libvips default: 0
+	// Compression: Compression for this file.
+	// libvips default: none (0)
 	Compression *TiffCompression
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Predictor Compression prediction.
-	// libvips default: 2
+	// Predictor: Compression prediction.
+	// libvips default: horizontal (2)
 	Predictor *TiffPredictor
-	// Tile Write a tiled tiff.
+	// Tile: Write a tiled tiff.
 	// libvips default: false
 	Tile *bool
-	// TileWidth Tile width in pixels.
+	// TileWidth: Tile width in pixels.
 	// libvips default: 128
 	TileWidth *int
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 128
 	TileHeight *int
-	// Pyramid Write a pyramidal tiff.
+	// Pyramid: Write a pyramidal tiff.
 	// libvips default: false
 	Pyramid *bool
-	// Miniswhite Use 0 for white in 1-bit images.
+	// Miniswhite: Use 0 for white in 1-bit images.
 	// libvips default: false
 	Miniswhite *bool
-	// Bitdepth Write as a 1, 2, 4 or 8 bit image.
+	// Bitdepth: Write as a 1, 2, 4 or 8 bit image.
 	// libvips default: 0
 	Bitdepth *int
-	// Resunit Resolution unit.
-	// libvips default: 0
+	// Resunit: Resolution unit.
+	// libvips default: cm (0)
 	Resunit *TiffResunit
-	// Xres Horizontal resolution in pixels/mm.
+	// Xres: Horizontal resolution in pixels/mm.
 	// libvips default: 1
 	Xres *float64
-	// Yres Vertical resolution in pixels/mm.
+	// Yres: Vertical resolution in pixels/mm.
 	// libvips default: 1
 	Yres *float64
-	// Bigtiff Write a bigtiff image.
+	// Bigtiff: Write a bigtiff image.
 	// libvips default: false
 	Bigtiff *bool
-	// Properties Write a properties document to IMAGEDESCRIPTION.
+	// Properties: Write a properties document to IMAGEDESCRIPTION.
 	// libvips default: false
 	Properties *bool
-	// RegionShrink Method to shrink regions.
-	// libvips default: 0
+	// RegionShrink: Method to shrink regions.
+	// libvips default: mean (0)
 	RegionShrink *RegionShrink
-	// Level Deflate (1-9, default 6) or ZSTD (1-22, default 9) compression level.
+	// Level: Deflate (1-9, default 6) or ZSTD (1-22, default 9) compression level.
 	// libvips default: 0
 	Level *int
-	// Lossless Enable WEBP lossless mode.
+	// Lossless: Enable WEBP lossless mode.
 	// libvips default: false
 	Lossless *bool
-	// Depth Pyramid depth.
-	// libvips default: 1
+	// Depth: Pyramid depth.
+	// libvips default: onetile (1)
 	Depth *DzDepth
-	// Subifd Save pyr layers as sub-IFDs.
+	// Subifd: Save pyr layers as sub-IFDs.
 	// libvips default: false
 	Subifd *bool
-	// Premultiply Save with premultiplied alpha.
+	// Premultiply: Save with premultiplied alpha.
 	// libvips default: false
 	Premultiply *bool
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -14075,75 +15340,75 @@ func Tiffsave(in *Image, filename string, options *TiffsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type TiffsaveBufferOptions struct {
-	// Compression Compression for this file.
-	// libvips default: 0
+	// Compression: Compression for this file.
+	// libvips default: none (0)
 	Compression *TiffCompression
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Predictor Compression prediction.
-	// libvips default: 2
+	// Predictor: Compression prediction.
+	// libvips default: horizontal (2)
 	Predictor *TiffPredictor
-	// Tile Write a tiled tiff.
+	// Tile: Write a tiled tiff.
 	// libvips default: false
 	Tile *bool
-	// TileWidth Tile width in pixels.
+	// TileWidth: Tile width in pixels.
 	// libvips default: 128
 	TileWidth *int
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 128
 	TileHeight *int
-	// Pyramid Write a pyramidal tiff.
+	// Pyramid: Write a pyramidal tiff.
 	// libvips default: false
 	Pyramid *bool
-	// Miniswhite Use 0 for white in 1-bit images.
+	// Miniswhite: Use 0 for white in 1-bit images.
 	// libvips default: false
 	Miniswhite *bool
-	// Bitdepth Write as a 1, 2, 4 or 8 bit image.
+	// Bitdepth: Write as a 1, 2, 4 or 8 bit image.
 	// libvips default: 0
 	Bitdepth *int
-	// Resunit Resolution unit.
-	// libvips default: 0
+	// Resunit: Resolution unit.
+	// libvips default: cm (0)
 	Resunit *TiffResunit
-	// Xres Horizontal resolution in pixels/mm.
+	// Xres: Horizontal resolution in pixels/mm.
 	// libvips default: 1
 	Xres *float64
-	// Yres Vertical resolution in pixels/mm.
+	// Yres: Vertical resolution in pixels/mm.
 	// libvips default: 1
 	Yres *float64
-	// Bigtiff Write a bigtiff image.
+	// Bigtiff: Write a bigtiff image.
 	// libvips default: false
 	Bigtiff *bool
-	// Properties Write a properties document to IMAGEDESCRIPTION.
+	// Properties: Write a properties document to IMAGEDESCRIPTION.
 	// libvips default: false
 	Properties *bool
-	// RegionShrink Method to shrink regions.
-	// libvips default: 0
+	// RegionShrink: Method to shrink regions.
+	// libvips default: mean (0)
 	RegionShrink *RegionShrink
-	// Level Deflate (1-9, default 6) or ZSTD (1-22, default 9) compression level.
+	// Level: Deflate (1-9, default 6) or ZSTD (1-22, default 9) compression level.
 	// libvips default: 0
 	Level *int
-	// Lossless Enable WEBP lossless mode.
+	// Lossless: Enable WEBP lossless mode.
 	// libvips default: false
 	Lossless *bool
-	// Depth Pyramid depth.
-	// libvips default: 1
+	// Depth: Pyramid depth.
+	// libvips default: onetile (1)
 	Depth *DzDepth
-	// Subifd Save pyr layers as sub-IFDs.
+	// Subifd: Save pyr layers as sub-IFDs.
 	// libvips default: false
 	Subifd *bool
-	// Premultiply Save with premultiplied alpha.
+	// Premultiply: Save with premultiplied alpha.
 	// libvips default: false
 	Premultiply *bool
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -14245,75 +15510,75 @@ func TiffsaveBuffer(in *Image, options *TiffsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type TiffsaveTargetOptions struct {
-	// Compression Compression for this file.
-	// libvips default: 0
+	// Compression: Compression for this file.
+	// libvips default: none (0)
 	Compression *TiffCompression
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Predictor Compression prediction.
-	// libvips default: 2
+	// Predictor: Compression prediction.
+	// libvips default: horizontal (2)
 	Predictor *TiffPredictor
-	// Tile Write a tiled tiff.
+	// Tile: Write a tiled tiff.
 	// libvips default: false
 	Tile *bool
-	// TileWidth Tile width in pixels.
+	// TileWidth: Tile width in pixels.
 	// libvips default: 128
 	TileWidth *int
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 128
 	TileHeight *int
-	// Pyramid Write a pyramidal tiff.
+	// Pyramid: Write a pyramidal tiff.
 	// libvips default: false
 	Pyramid *bool
-	// Miniswhite Use 0 for white in 1-bit images.
+	// Miniswhite: Use 0 for white in 1-bit images.
 	// libvips default: false
 	Miniswhite *bool
-	// Bitdepth Write as a 1, 2, 4 or 8 bit image.
+	// Bitdepth: Write as a 1, 2, 4 or 8 bit image.
 	// libvips default: 0
 	Bitdepth *int
-	// Resunit Resolution unit.
-	// libvips default: 0
+	// Resunit: Resolution unit.
+	// libvips default: cm (0)
 	Resunit *TiffResunit
-	// Xres Horizontal resolution in pixels/mm.
+	// Xres: Horizontal resolution in pixels/mm.
 	// libvips default: 1
 	Xres *float64
-	// Yres Vertical resolution in pixels/mm.
+	// Yres: Vertical resolution in pixels/mm.
 	// libvips default: 1
 	Yres *float64
-	// Bigtiff Write a bigtiff image.
+	// Bigtiff: Write a bigtiff image.
 	// libvips default: false
 	Bigtiff *bool
-	// Properties Write a properties document to IMAGEDESCRIPTION.
+	// Properties: Write a properties document to IMAGEDESCRIPTION.
 	// libvips default: false
 	Properties *bool
-	// RegionShrink Method to shrink regions.
-	// libvips default: 0
+	// RegionShrink: Method to shrink regions.
+	// libvips default: mean (0)
 	RegionShrink *RegionShrink
-	// Level Deflate (1-9, default 6) or ZSTD (1-22, default 9) compression level.
+	// Level: Deflate (1-9, default 6) or ZSTD (1-22, default 9) compression level.
 	// libvips default: 0
 	Level *int
-	// Lossless Enable WEBP lossless mode.
+	// Lossless: Enable WEBP lossless mode.
 	// libvips default: false
 	Lossless *bool
-	// Depth Pyramid depth.
-	// libvips default: 1
+	// Depth: Pyramid depth.
+	// libvips default: onetile (1)
 	Depth *DzDepth
-	// Subifd Save pyr layers as sub-IFDs.
+	// Subifd: Save pyr layers as sub-IFDs.
 	// libvips default: false
 	Subifd *bool
-	// Premultiply Save with premultiplied alpha.
+	// Premultiply: Save with premultiplied alpha.
 	// libvips default: false
 	Premultiply *bool
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -14413,22 +15678,22 @@ func TiffsaveTarget(in *Image, target *Target, options *TiffsaveTargetOptions) e
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type TilecacheOptions struct {
-	// TileWidth Tile width in pixels.
+	// TileWidth: Tile width in pixels.
 	// libvips default: 128
 	TileWidth *int
-	// TileHeight Tile height in pixels.
+	// TileHeight: Tile height in pixels.
 	// libvips default: 128
 	TileHeight *int
-	// MaxTiles Maximum number of tiles to cache.
+	// MaxTiles: Maximum number of tiles to cache.
 	// libvips default: 1000
 	MaxTiles *int
-	// Access Expected access pattern.
-	// libvips default: 0
+	// Access: Expected access pattern.
+	// libvips default: random (0)
 	Access *Access
-	// Threaded Allow threaded access.
+	// Threaded: Allow threaded access.
 	// libvips default: false
 	Threaded *bool
-	// Persistent Keep cache between evaluations.
+	// Persistent: Keep cache between evaluations.
 	// libvips default: false
 	Persistent *bool
 }
@@ -14477,34 +15742,34 @@ func Tilecache(in *Image, options *TilecacheOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type TonelutOptions struct {
-	// InMax Size of LUT to build.
+	// InMax: Size of LUT to build.
 	// libvips default: 32767
 	InMax *int
-	// OutMax Maximum value in output LUT.
+	// OutMax: Maximum value in output LUT.
 	// libvips default: 32767
 	OutMax *int
-	// Lb Lowest value in output.
+	// Lb: Lowest value in output.
 	// libvips default: 0
 	Lb *float64
-	// Lw Highest value in output.
+	// Lw: Highest value in output.
 	// libvips default: 100
 	Lw *float64
-	// Ps Position of shadow.
+	// Ps: Position of shadow.
 	// libvips default: 0.2
 	Ps *float64
-	// Pm Position of mid-tones.
+	// Pm: Position of mid-tones.
 	// libvips default: 0.5
 	Pm *float64
-	// Ph Position of highlights.
+	// Ph: Position of highlights.
 	// libvips default: 0.8
 	Ph *float64
-	// S Adjust shadows by this much.
+	// S: Adjust shadows by this much.
 	// libvips default: 0
 	S *float64
-	// M Adjust mid-tones by this much.
+	// M: Adjust mid-tones by this much.
 	// libvips default: 0
 	M *float64
-	// H Adjust highlights by this much.
+	// H: Adjust highlights by this much.
 	// libvips default: 0
 	H *float64
 }
@@ -14562,7 +15827,7 @@ func Tonelut(options *TonelutOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type Transpose3dOptions struct {
-	// PageHeight Height of each input page.
+	// PageHeight: Height of each input page.
 	// libvips default: 0
 	PageHeight *int
 }
@@ -14614,29 +15879,35 @@ func Uhdr2scRGB(in *Image) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type UhdrloadOptions struct {
-	// Shrink Shrink factor on load.
+	// Shrink: Shrink factor on load.
 	// libvips default: 1
 	Shrink *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Uhdrload runs the libvips "uhdrload" operation: load a UHDR image.
 //
 // filename: Filename to load from.
 func Uhdrload(filename string, options *UhdrloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Shrink != nil {
@@ -14654,6 +15925,9 @@ func Uhdrload(filename string, options *UhdrloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("uhdrload", args...)
 	if err != nil {
@@ -14665,6 +15939,13 @@ func Uhdrload(filename string, options *UhdrloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -14672,29 +15953,35 @@ func Uhdrload(filename string, options *UhdrloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type UhdrloadBufferOptions struct {
-	// Shrink Shrink factor on load.
+	// Shrink: Shrink factor on load.
 	// libvips default: 1
 	Shrink *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // UhdrloadBuffer runs the libvips "uhdrload_buffer" operation: load a UHDR image.
 //
 // buffer: Buffer to load from.
 func UhdrloadBuffer(buffer []byte, options *UhdrloadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Shrink != nil {
@@ -14712,6 +15999,9 @@ func UhdrloadBuffer(buffer []byte, options *UhdrloadBufferOptions) (*Image, erro
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("uhdrload_buffer", args...)
 	if err != nil {
@@ -14723,6 +16013,13 @@ func UhdrloadBuffer(buffer []byte, options *UhdrloadBufferOptions) (*Image, erro
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -14730,29 +16027,35 @@ func UhdrloadBuffer(buffer []byte, options *UhdrloadBufferOptions) (*Image, erro
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type UhdrloadSourceOptions struct {
-	// Shrink Shrink factor on load.
+	// Shrink: Shrink factor on load.
 	// libvips default: 1
 	Shrink *int
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // UhdrloadSource runs the libvips "uhdrload_source" operation: load a UHDR image.
 //
 // source: Source to load from.
 func UhdrloadSource(source *Source, options *UhdrloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 6)
+	args := make([]Arg, 0, 7)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Shrink != nil {
@@ -14770,6 +16073,9 @@ func UhdrloadSource(source *Source, options *UhdrloadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("uhdrload_source", args...)
 	if err != nil {
@@ -14781,6 +16087,13 @@ func UhdrloadSource(source *Source, options *UhdrloadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -14789,21 +16102,21 @@ func UhdrloadSource(source *Source, options *UhdrloadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type UhdrsaveOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// GainmapScaleFactor The scale factor of base image to gainmap image.
+	// GainmapScaleFactor: The scale factor of base image to gainmap image.
 	// libvips default: 2
 	GainmapScaleFactor *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -14849,21 +16162,21 @@ func Uhdrsave(in *Image, filename string, options *UhdrsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type UhdrsaveBufferOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// GainmapScaleFactor The scale factor of base image to gainmap image.
+	// GainmapScaleFactor: The scale factor of base image to gainmap image.
 	// libvips default: 2
 	GainmapScaleFactor *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -14911,21 +16224,21 @@ func UhdrsaveBuffer(in *Image, options *UhdrsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type UhdrsaveTargetOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// GainmapScaleFactor The scale factor of base image to gainmap image.
+	// GainmapScaleFactor: The scale factor of base image to gainmap image.
 	// libvips default: 2
 	GainmapScaleFactor *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -14971,10 +16284,10 @@ func UhdrsaveTarget(in *Image, target *Target, options *UhdrsaveTargetOptions) e
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type UnpremultiplyOptions struct {
-	// MaxAlpha Maximum value of alpha channel.
+	// MaxAlpha: Maximum value of alpha channel.
 	// libvips default: 255
 	MaxAlpha *float64
-	// AlphaBand Unpremultiply with this alpha.
+	// AlphaBand: Unpremultiply with this alpha.
 	// libvips default: 3
 	AlphaBand *int
 }
@@ -15010,26 +16323,32 @@ func Unpremultiply(in *Image, options *UnpremultiplyOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type VipsloadOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Vipsload runs the libvips "vipsload" operation: load vips from file.
 //
 // filename: Filename to load from.
 func Vipsload(filename string, options *VipsloadOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Memory != nil {
@@ -15044,6 +16363,9 @@ func Vipsload(filename string, options *VipsloadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("vipsload", args...)
 	if err != nil {
@@ -15055,6 +16377,13 @@ func Vipsload(filename string, options *VipsloadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -15062,26 +16391,32 @@ func Vipsload(filename string, options *VipsloadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type VipsloadSourceOptions struct {
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // VipsloadSource runs the libvips "vipsload_source" operation: load vips from source.
 //
 // source: Source to load from.
 func VipsloadSource(source *Source, options *VipsloadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 5)
+	args := make([]Arg, 0, 6)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Memory != nil {
@@ -15096,6 +16431,9 @@ func VipsloadSource(source *Source, options *VipsloadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("vipsload_source", args...)
 	if err != nil {
@@ -15107,6 +16445,13 @@ func VipsloadSource(source *Source, options *VipsloadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -15115,15 +16460,15 @@ func VipsloadSource(source *Source, options *VipsloadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type VipssaveOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -15163,15 +16508,15 @@ func Vipssave(in *Image, filename string, options *VipssaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type VipssaveTargetOptions struct {
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -15210,35 +16555,41 @@ func VipssaveTarget(in *Image, target *Target, options *VipssaveTargetOptions) e
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type WebploadOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Scale Factor to scale by.
+	// Scale: Factor to scale by.
 	// libvips default: 1
 	Scale *float64
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // Webpload runs the libvips "webpload" operation: load webp from file.
 //
 // filename: Filename to load from.
 func Webpload(filename string, options *WebploadOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("filename", filename))
 	if options != nil {
 		if options.Page != nil {
@@ -15262,6 +16613,9 @@ func Webpload(filename string, options *WebploadOptions) (*Image, error) {
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("webpload", args...)
 	if err != nil {
@@ -15273,6 +16627,13 @@ func Webpload(filename string, options *WebploadOptions) (*Image, error) {
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -15280,35 +16641,41 @@ func Webpload(filename string, options *WebploadOptions) (*Image, error) {
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type WebploadBufferOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Scale Factor to scale by.
+	// Scale: Factor to scale by.
 	// libvips default: 1
 	Scale *float64
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // WebploadBuffer runs the libvips "webpload_buffer" operation: load webp from buffer.
 //
 // buffer: Buffer to load from.
 func WebploadBuffer(buffer []byte, options *WebploadBufferOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("buffer", buffer))
 	if options != nil {
 		if options.Page != nil {
@@ -15332,6 +16699,9 @@ func WebploadBuffer(buffer []byte, options *WebploadBufferOptions) (*Image, erro
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("webpload_buffer", args...)
 	if err != nil {
@@ -15343,6 +16713,13 @@ func WebploadBuffer(buffer []byte, options *WebploadBufferOptions) (*Image, erro
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -15350,35 +16727,41 @@ func WebploadBuffer(buffer []byte, options *WebploadBufferOptions) (*Image, erro
 //
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
+//
+// Fields marked as outputs request an optional output: point one at a
+// variable and the operation's answer is written through it. A slot the
+// operation does not fill is left untouched.
 type WebploadSourceOptions struct {
-	// Page First page to load.
+	// Page: First page to load.
 	// libvips default: 0
 	Page *int
-	// N Number of pages to load, -1 for all.
+	// N: Number of pages to load, -1 for all.
 	// libvips default: 1
 	N *int
-	// Scale Factor to scale by.
+	// Scale: Factor to scale by.
 	// libvips default: 1
 	Scale *float64
-	// Memory Force open via memory.
+	// Memory: Force open via memory.
 	// libvips default: false
 	Memory *bool
-	// Access Required access pattern for this file.
-	// libvips default: 0
+	// Access: Required access pattern for this file.
+	// libvips default: random (0)
 	Access *Access
-	// FailOn Error level to fail on.
-	// libvips default: 0
+	// FailOn: Error level to fail on.
+	// libvips default: none (0)
 	FailOn *FailOn
-	// Revalidate Don't use a cached result for this operation.
+	// Revalidate: Don't use a cached result for this operation.
 	// libvips default: false
 	Revalidate *bool
+	// Flags: output — Flags for this file.
+	Flags *Flags
 }
 
 // WebploadSource runs the libvips "webpload_source" operation: load webp from source.
 //
 // source: Source to load from.
 func WebploadSource(source *Source, options *WebploadSourceOptions) (*Image, error) {
-	args := make([]Arg, 0, 8)
+	args := make([]Arg, 0, 9)
 	args = append(args, In("source", source))
 	if options != nil {
 		if options.Page != nil {
@@ -15402,6 +16785,9 @@ func WebploadSource(source *Source, options *WebploadSourceOptions) (*Image, err
 		if options.Revalidate != nil {
 			args = append(args, In("revalidate", *options.Revalidate))
 		}
+		if options.Flags != nil {
+			args = append(args, Out("flags"))
+		}
 	}
 	outs, err := Call("webpload_source", args...)
 	if err != nil {
@@ -15413,6 +16799,13 @@ func WebploadSource(source *Source, options *WebploadSourceOptions) (*Image, err
 		return nil, err
 	}
 	r0 := v0
+	if options != nil {
+		if options.Flags != nil {
+			if v, err := outs.Int("flags"); err == nil {
+				*options.Flags = Flags(v)
+			}
+		}
+	}
 	return r0, nil
 }
 
@@ -15421,60 +16814,60 @@ func WebploadSource(source *Source, options *WebploadSourceOptions) (*Image, err
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type WebpsaveOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Exact Preserve color values from transparent pixels.
+	// Exact: Preserve color values from transparent pixels.
 	// libvips default: false
 	Exact *bool
-	// Preset Preset for lossy compression.
-	// libvips default: 0
+	// Preset: Preset for lossy compression.
+	// libvips default: default (0)
 	Preset *WebpPreset
-	// SmartSubsample Enable high quality chroma subsampling.
+	// SmartSubsample: Enable high quality chroma subsampling.
 	// libvips default: false
 	SmartSubsample *bool
-	// NearLossless Enable preprocessing in lossless mode (uses Q).
+	// NearLossless: Enable preprocessing in lossless mode (uses Q).
 	// libvips default: false
 	NearLossless *bool
-	// AlphaQ Change alpha plane fidelity for lossy compression.
+	// AlphaQ: Change alpha plane fidelity for lossy compression.
 	// libvips default: 100
 	AlphaQ *int
-	// MinSize Optimise for minimum size.
+	// MinSize: Optimise for minimum size.
 	// libvips default: false
 	MinSize *bool
-	// Kmin Minimum number of frames between key frames.
+	// Kmin: Minimum number of frames between key frames.
 	// libvips default: 2147483646
 	Kmin *int
-	// Kmax Maximum number of frames between key frames.
+	// Kmax: Maximum number of frames between key frames.
 	// libvips default: 2147483647
 	Kmax *int
-	// Effort Level of CPU effort to reduce file size.
+	// Effort: Level of CPU effort to reduce file size.
 	// libvips default: 4
 	Effort *int
-	// TargetSize Desired target size in bytes.
+	// TargetSize: Desired target size in bytes.
 	// libvips default: 0
 	TargetSize *int
-	// Mixed Allow mixed encoding (might reduce file size).
+	// Mixed: Allow mixed encoding (might reduce file size).
 	// libvips default: false
 	Mixed *bool
-	// SmartDeblock Enable auto-adjusting of the deblocking filter.
+	// SmartDeblock: Enable auto-adjusting of the deblocking filter.
 	// libvips default: false
 	SmartDeblock *bool
-	// Passes Number of entropy-analysis passes (in [1..10]).
+	// Passes: Number of entropy-analysis passes (in [1..10]).
 	// libvips default: 1
 	Passes *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -15559,60 +16952,60 @@ func Webpsave(in *Image, filename string, options *WebpsaveOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type WebpsaveBufferOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Exact Preserve color values from transparent pixels.
+	// Exact: Preserve color values from transparent pixels.
 	// libvips default: false
 	Exact *bool
-	// Preset Preset for lossy compression.
-	// libvips default: 0
+	// Preset: Preset for lossy compression.
+	// libvips default: default (0)
 	Preset *WebpPreset
-	// SmartSubsample Enable high quality chroma subsampling.
+	// SmartSubsample: Enable high quality chroma subsampling.
 	// libvips default: false
 	SmartSubsample *bool
-	// NearLossless Enable preprocessing in lossless mode (uses Q).
+	// NearLossless: Enable preprocessing in lossless mode (uses Q).
 	// libvips default: false
 	NearLossless *bool
-	// AlphaQ Change alpha plane fidelity for lossy compression.
+	// AlphaQ: Change alpha plane fidelity for lossy compression.
 	// libvips default: 100
 	AlphaQ *int
-	// MinSize Optimise for minimum size.
+	// MinSize: Optimise for minimum size.
 	// libvips default: false
 	MinSize *bool
-	// Kmin Minimum number of frames between key frames.
+	// Kmin: Minimum number of frames between key frames.
 	// libvips default: 2147483646
 	Kmin *int
-	// Kmax Maximum number of frames between key frames.
+	// Kmax: Maximum number of frames between key frames.
 	// libvips default: 2147483647
 	Kmax *int
-	// Effort Level of CPU effort to reduce file size.
+	// Effort: Level of CPU effort to reduce file size.
 	// libvips default: 4
 	Effort *int
-	// TargetSize Desired target size in bytes.
+	// TargetSize: Desired target size in bytes.
 	// libvips default: 0
 	TargetSize *int
-	// Mixed Allow mixed encoding (might reduce file size).
+	// Mixed: Allow mixed encoding (might reduce file size).
 	// libvips default: false
 	Mixed *bool
-	// SmartDeblock Enable auto-adjusting of the deblocking filter.
+	// SmartDeblock: Enable auto-adjusting of the deblocking filter.
 	// libvips default: false
 	SmartDeblock *bool
-	// Passes Number of entropy-analysis passes (in [1..10]).
+	// Passes: Number of entropy-analysis passes (in [1..10]).
 	// libvips default: 1
 	Passes *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -15699,60 +17092,60 @@ func WebpsaveBuffer(in *Image, options *WebpsaveBufferOptions) ([]byte, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type WebpsaveMimeOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Exact Preserve color values from transparent pixels.
+	// Exact: Preserve color values from transparent pixels.
 	// libvips default: false
 	Exact *bool
-	// Preset Preset for lossy compression.
-	// libvips default: 0
+	// Preset: Preset for lossy compression.
+	// libvips default: default (0)
 	Preset *WebpPreset
-	// SmartSubsample Enable high quality chroma subsampling.
+	// SmartSubsample: Enable high quality chroma subsampling.
 	// libvips default: false
 	SmartSubsample *bool
-	// NearLossless Enable preprocessing in lossless mode (uses Q).
+	// NearLossless: Enable preprocessing in lossless mode (uses Q).
 	// libvips default: false
 	NearLossless *bool
-	// AlphaQ Change alpha plane fidelity for lossy compression.
+	// AlphaQ: Change alpha plane fidelity for lossy compression.
 	// libvips default: 100
 	AlphaQ *int
-	// MinSize Optimise for minimum size.
+	// MinSize: Optimise for minimum size.
 	// libvips default: false
 	MinSize *bool
-	// Kmin Minimum number of frames between key frames.
+	// Kmin: Minimum number of frames between key frames.
 	// libvips default: 2147483646
 	Kmin *int
-	// Kmax Maximum number of frames between key frames.
+	// Kmax: Maximum number of frames between key frames.
 	// libvips default: 2147483647
 	Kmax *int
-	// Effort Level of CPU effort to reduce file size.
+	// Effort: Level of CPU effort to reduce file size.
 	// libvips default: 4
 	Effort *int
-	// TargetSize Desired target size in bytes.
+	// TargetSize: Desired target size in bytes.
 	// libvips default: 0
 	TargetSize *int
-	// Mixed Allow mixed encoding (might reduce file size).
+	// Mixed: Allow mixed encoding (might reduce file size).
 	// libvips default: false
 	Mixed *bool
-	// SmartDeblock Enable auto-adjusting of the deblocking filter.
+	// SmartDeblock: Enable auto-adjusting of the deblocking filter.
 	// libvips default: false
 	SmartDeblock *bool
-	// Passes Number of entropy-analysis passes (in [1..10]).
+	// Passes: Number of entropy-analysis passes (in [1..10]).
 	// libvips default: 1
 	Passes *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -15834,60 +17227,60 @@ func WebpsaveMime(in *Image, options *WebpsaveMimeOptions) error {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type WebpsaveTargetOptions struct {
-	// Q Q factor.
+	// Q: Q factor.
 	// libvips default: 75
 	Q *int
-	// Lossless Enable lossless compression.
+	// Lossless: Enable lossless compression.
 	// libvips default: false
 	Lossless *bool
-	// Exact Preserve color values from transparent pixels.
+	// Exact: Preserve color values from transparent pixels.
 	// libvips default: false
 	Exact *bool
-	// Preset Preset for lossy compression.
-	// libvips default: 0
+	// Preset: Preset for lossy compression.
+	// libvips default: default (0)
 	Preset *WebpPreset
-	// SmartSubsample Enable high quality chroma subsampling.
+	// SmartSubsample: Enable high quality chroma subsampling.
 	// libvips default: false
 	SmartSubsample *bool
-	// NearLossless Enable preprocessing in lossless mode (uses Q).
+	// NearLossless: Enable preprocessing in lossless mode (uses Q).
 	// libvips default: false
 	NearLossless *bool
-	// AlphaQ Change alpha plane fidelity for lossy compression.
+	// AlphaQ: Change alpha plane fidelity for lossy compression.
 	// libvips default: 100
 	AlphaQ *int
-	// MinSize Optimise for minimum size.
+	// MinSize: Optimise for minimum size.
 	// libvips default: false
 	MinSize *bool
-	// Kmin Minimum number of frames between key frames.
+	// Kmin: Minimum number of frames between key frames.
 	// libvips default: 2147483646
 	Kmin *int
-	// Kmax Maximum number of frames between key frames.
+	// Kmax: Maximum number of frames between key frames.
 	// libvips default: 2147483647
 	Kmax *int
-	// Effort Level of CPU effort to reduce file size.
+	// Effort: Level of CPU effort to reduce file size.
 	// libvips default: 4
 	Effort *int
-	// TargetSize Desired target size in bytes.
+	// TargetSize: Desired target size in bytes.
 	// libvips default: 0
 	TargetSize *int
-	// Mixed Allow mixed encoding (might reduce file size).
+	// Mixed: Allow mixed encoding (might reduce file size).
 	// libvips default: false
 	Mixed *bool
-	// SmartDeblock Enable auto-adjusting of the deblocking filter.
+	// SmartDeblock: Enable auto-adjusting of the deblocking filter.
 	// libvips default: false
 	SmartDeblock *bool
-	// Passes Number of entropy-analysis passes (in [1..10]).
+	// Passes: Number of entropy-analysis passes (in [1..10]).
 	// libvips default: 1
 	Passes *int
-	// Keep Which metadata to retain.
-	// libvips default: 63
+	// Keep: Which metadata to retain.
+	// libvips default: all (63)
 	Keep *Keep
-	// Background Background value.
+	// Background: Background value.
 	Background *[]float64
-	// PageHeight Set page height for multipage save.
+	// PageHeight: Set page height for multipage save.
 	// libvips default: 0
 	PageHeight *int
-	// Profile Filename of ICC profile to embed.
+	// Profile: Filename of ICC profile to embed.
 	Profile *string
 }
 
@@ -15972,10 +17365,10 @@ func WebpsaveTarget(in *Image, target *Target, options *WebpsaveTargetOptions) e
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type WorleyOptions struct {
-	// CellSize Size of Worley cells.
+	// CellSize: Size of Worley cells.
 	// libvips default: 256
 	CellSize *int
-	// Seed Random number seed.
+	// Seed: Random number seed.
 	// libvips default: 0
 	Seed *int
 }
@@ -16015,10 +17408,10 @@ func Worley(width int, height int, options *WorleyOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type WrapOptions struct {
-	// X Left edge of input in output.
+	// X: Left edge of input in output.
 	// libvips default: 0
 	X *int
-	// Y Top edge of input in output.
+	// Y: Top edge of input in output.
 	// libvips default: 0
 	Y *int
 }
@@ -16055,13 +17448,13 @@ func Wrap(in *Image, options *WrapOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type XyzOptions struct {
-	// Csize Size of third dimension.
+	// Csize: Size of third dimension.
 	// libvips default: 1
 	Csize *int
-	// Dsize Size of fourth dimension.
+	// Dsize: Size of fourth dimension.
 	// libvips default: 1
 	Dsize *int
-	// Esize Size of fifth dimension.
+	// Esize: Size of fifth dimension.
 	// libvips default: 1
 	Esize *int
 }
@@ -16104,7 +17497,7 @@ func Xyz(width int, height int, options *XyzOptions) (*Image, error) {
 // A nil field is not sent, so libvips applies its own default. A non-nil
 // field is sent exactly as given, including a pointer to zero.
 type ZoneOptions struct {
-	// Uchar Output an unsigned char image.
+	// Uchar: Output an unsigned char image.
 	// libvips default: false
 	Uchar *bool
 }

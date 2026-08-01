@@ -101,8 +101,10 @@ func demos() []demo {
 		},
 		{
 			Name: "Autorot", Govips: "AutoRotate",
-			Code: `vips.Autorot(im)`,
-			Run:  vips.Autorot,
+			Code: `vips.Autorot(im, nil)`,
+			Run: func(im *vips.Image) (*vips.Image, error) {
+				return vips.Autorot(im, nil)
+			},
 		},
 		{
 			Name: "Embed", Govips: "Embed / EmbedBackground",
@@ -311,18 +313,10 @@ vips.Composite2(base, txt, vips.BlendModeOver, &vips.Composite2Options{
 		},
 		{
 			Name: "DrawRect", Govips: "DrawRect",
-			Code: `own, _ := vips.Copy(im, nil)   // draw_* mutate in place
-vips.DrawRect(own, []float64{255, 0, 0}, 60, 60, 300, 200, nil)`,
+			Code: `vips.DrawRect(im, []float64{255, 0, 0}, 60, 60, 300, 200, nil)`,
 			Run: func(im *vips.Image) (*vips.Image, error) {
-				own, err := vips.Copy(im, nil)
-				if err != nil {
-					return nil, err
-				}
-				if err := vips.DrawRect(own, []float64{255, 0, 0}, 60, 60, 300, 200, nil); err != nil {
-					own.Close()
-					return nil, err
-				}
-				return own, nil
+				// Draws on a private copy and returns it; im is untouched.
+				return vips.DrawRect(im, []float64{255, 0, 0}, 60, 60, 300, 200, nil)
 			},
 		},
 		{
@@ -396,11 +390,13 @@ func matrix3x3(values []float64) (*vips.Image, error) {
 		return nil, err
 	}
 	for i, v := range values {
-		if err := vips.DrawRect(m, []float64{v}, i%3, i/3, 1, 1,
-			&vips.DrawRectOptions{Fill: vips.Ptr(true)}); err != nil {
-			m.Close()
+		next, err := vips.DrawRect(m, []float64{v}, i%3, i/3, 1, 1,
+			&vips.DrawRectOptions{Fill: vips.Ptr(true)})
+		m.Close()
+		if err != nil {
 			return nil, err
 		}
+		m = next
 	}
 	return m, nil
 }
