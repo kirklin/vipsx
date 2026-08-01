@@ -7,6 +7,7 @@ package vips
 import "C"
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -32,17 +33,28 @@ var (
 	streamID  atomic.Uint64
 )
 
+// ErrStreamClosed is what Err reports when libvips asked for bytes after the
+// source or target was closed.
+//
+// It is the most likely way a stream fails and the one libvips describes worst:
+// its own message is a generic read or write error. Either evaluate the image
+// before closing, or take the pixels with CopyMemory and close whenever.
+var ErrStreamClosed = errors.New(
+	"vips: the stream was closed while an image still needed it; " +
+		"evaluate the image first, or call CopyMemory and close whenever")
+
 type stream struct {
 	id     uint64
+	closed atomic.Bool
+
+	// mu guards the reader, writer and error together: Close drops the first
+	// two while a libvips worker thread may be using them, and Err reads the
+	// third from a third goroutine.
+	mu     sync.Mutex
 	reader io.Reader
 	seeker io.Seeker
 	writer io.Writer
-
-	// err is written from whichever thread libvips calls back on and read from
-	// whatever goroutine asks Err, so it takes a lock rather than a comment
-	// about who may touch it when.
-	mu  sync.Mutex
-	err error // the first failure, kept for Err to report
+	err    error // the first failure, kept for Err to report
 }
 
 // setErr keeps the first error. Later ones are usually consequences of it.
@@ -60,6 +72,33 @@ func (s *stream) firstErr() error {
 	return s.err
 }
 
+// release drops the reader or writer at Close, which is the whole point of
+// closing: the caller gets it back immediately rather than when libvips
+// eventually lets go of the C object.
+//
+// The registry entry itself stays until the C object dies, and that is what
+// makes ErrStreamClosed possible. Deleting the entry here instead left a later
+// callback finding nothing at all, so the operation failed with libvips'
+// generic read error and Err — the thing that exists to say why — had nothing
+// to say. The entry is a few words; the reader was the thing worth freeing.
+func (s *stream) release() {
+	s.closed.Store(true)
+	s.mu.Lock()
+	s.reader, s.seeker, s.writer = nil, nil, nil
+	s.mu.Unlock()
+}
+
+// use hands the reader out under the lock, or reports that it is gone.
+func (s *stream) use() (io.Reader, io.Seeker, io.Writer, bool) {
+	if s.closed.Load() {
+		s.setErr(ErrStreamClosed)
+		return nil, nil, nil, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.reader, s.seeker, s.writer, true
+}
+
 func registerStream(s *stream) uint64 {
 	s.id = streamID.Add(1)
 	streamsMu.Lock()
@@ -69,13 +108,24 @@ func registerStream(s *stream) uint64 {
 }
 
 // OpenStreams reports how many reader- or writer-backed sources and targets are
-// still registered. It should return to zero once everything is closed; a
-// number that only grows means Close is being skipped somewhere, and each
-// missed one pins a reader or writer until the collector gets to the handle.
+// still holding their reader or writer. It should return to zero once everything
+// is closed; a number that only grows means Close is being skipped somewhere,
+// and each missed one pins a reader or writer until the collector gets to the
+// handle.
+//
+// A closed stream keeps a small registry entry until libvips lets go of the C
+// object, so it can say ErrStreamClosed if a callback arrives late. That entry
+// holds nothing of the caller's and is not counted here.
 func OpenStreams() int {
 	streamsMu.RLock()
 	defer streamsMu.RUnlock()
-	return len(streams)
+	n := 0
+	for _, s := range streams {
+		if !s.closed.Load() {
+			n++
+		}
+	}
+	return n
 }
 
 func lookupStream(id uint64) *stream {
@@ -93,11 +143,15 @@ func unregisterStream(id uint64) {
 //export vipsxGoRead
 func vipsxGoRead(id C.guint64, buffer unsafe.Pointer, length C.gint64) C.gint64 {
 	s := lookupStream(uint64(id))
-	if s == nil || s.reader == nil || length <= 0 {
+	if s == nil || length <= 0 {
+		return -1
+	}
+	reader, _, _, ok := s.use()
+	if !ok || reader == nil {
 		return -1
 	}
 
-	n, err := s.reader.Read(unsafe.Slice((*byte)(buffer), int(length)))
+	n, err := reader.Read(unsafe.Slice((*byte)(buffer), int(length)))
 	if n > 0 {
 		// A short read is not an error to libvips; it asks again. The error
 		// still has to be kept now: a reader that hands over its last bytes
@@ -121,10 +175,14 @@ func vipsxGoRead(id C.guint64, buffer unsafe.Pointer, length C.gint64) C.gint64 
 //export vipsxGoSeek
 func vipsxGoSeek(id C.guint64, offset C.gint64, whence C.int) C.gint64 {
 	s := lookupStream(uint64(id))
-	if s == nil || s.seeker == nil {
+	if s == nil {
 		return -1
 	}
-	pos, err := s.seeker.Seek(int64(offset), int(whence))
+	_, seeker, _, ok := s.use()
+	if !ok || seeker == nil {
+		return -1
+	}
+	pos, err := seeker.Seek(int64(offset), int(whence))
 	if err != nil {
 		s.setErr(err)
 		return -1
@@ -135,10 +193,14 @@ func vipsxGoSeek(id C.guint64, offset C.gint64, whence C.int) C.gint64 {
 //export vipsxGoWrite
 func vipsxGoWrite(id C.guint64, data unsafe.Pointer, length C.gint64) C.gint64 {
 	s := lookupStream(uint64(id))
-	if s == nil || s.writer == nil {
+	if s == nil {
 		return -1
 	}
-	n, err := s.writer.Write(unsafe.Slice((*byte)(data), int(length)))
+	_, _, writer, ok := s.use()
+	if !ok || writer == nil {
+		return -1
+	}
+	n, err := writer.Write(unsafe.Slice((*byte)(data), int(length)))
 	if err != nil {
 		s.setErr(err)
 		return -1
@@ -152,7 +214,11 @@ func vipsxGoEnd(id C.guint64) C.int {
 	if s == nil {
 		return -1
 	}
-	if f, ok := s.writer.(interface{ Flush() error }); ok {
+	_, _, writer, live := s.use()
+	if !live {
+		return -1
+	}
+	if f, ok := writer.(interface{ Flush() error }); ok {
 		if err := f.Flush(); err != nil {
 			s.setErr(err)
 			return -1

@@ -2,6 +2,7 @@ package vips_test
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -190,5 +191,88 @@ func TestSourceToTargetWithoutKnowingTheFormat(t *testing.T) {
 	defer back.Close()
 	if back.Width() != 32 {
 		t.Errorf("the thumbnail came back %d wide, want 32", back.Width())
+	}
+}
+
+// libvips reports a stream that went away as a generic read failure, which
+// names neither the stream nor the reason. Err is where the reason lives, and
+// closing early is much the most likely way to get here.
+func TestErrNamesAClosedSource(t *testing.T) {
+	jpg := readTestdata(t, "noise.jpg")
+
+	src, err := vips.NewSourceFromReader(bytes.NewReader(jpg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	im, err := vips.LoadSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer im.Close()
+
+	src.Close() // before anything has been evaluated
+
+	if _, err := vips.SaveBuffer(im, ".png"); err == nil {
+		t.Fatal("saving succeeded after the source was closed")
+	}
+	if !errors.Is(src.Err(), vips.ErrStreamClosed) {
+		t.Fatalf("Source.Err() is %v, want ErrStreamClosed", src.Err())
+	}
+}
+
+// Targets fail earlier and more clearly than sources, and the asymmetry is
+// worth pinning down rather than assuming symmetry. A target is used during the
+// call, so a closed one is caught by the argument check before the save starts;
+// a source is used lazily during evaluation, which is why it can go away
+// underneath an image and needs ErrStreamClosed to explain itself.
+func TestClosedTargetIsRejectedBeforeTheSaveStarts(t *testing.T) {
+	im := load(t, "noise.png")
+
+	var out bytes.Buffer
+	tg, err := vips.NewTargetToWriter(&out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tg.Close()
+
+	err = vips.SaveTarget(im, tg, ".png")
+	if err == nil {
+		t.Fatal("saving to a closed target succeeded")
+	}
+	if !strings.Contains(err.Error(), "closed") {
+		t.Errorf("the error does not say the handle was closed: %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("%d bytes reached the writer of a closed target", out.Len())
+	}
+	// Nothing was ever written, so there is nothing for Err to report. It
+	// reporting a cause here would mean the save had started.
+	if tg.Err() != nil {
+		t.Errorf("Target.Err() is %v; nothing was written, so it should be nil", tg.Err())
+	}
+}
+
+// A stream that was never in trouble must not acquire an error just by being
+// closed in the right order.
+func TestErrStaysNilOnACleanStream(t *testing.T) {
+	jpg := readTestdata(t, "noise.jpg")
+
+	src, err := vips.NewSourceFromReader(bytes.NewReader(jpg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	im, err := vips.LoadSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer im.Close()
+
+	if _, err := vips.SaveBuffer(im, ".png"); err != nil {
+		t.Fatal(err)
+	}
+	src.Close()
+
+	if err := src.Err(); err != nil {
+		t.Fatalf("a source used and closed in order reports %v", err)
 	}
 }
