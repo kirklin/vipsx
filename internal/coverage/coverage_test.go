@@ -57,7 +57,7 @@ func checkCoverage(t *testing.T, listName string) {
 	want := readList(t, listName)
 	have := reachable(t)
 
-	var missing, viaAlias, notAnOperation []string
+	var viaAlias, notAnOperation []string
 	for _, op := range want {
 		if have[op] {
 			continue
@@ -73,18 +73,25 @@ func checkCoverage(t *testing.T, listName string) {
 		}
 		notAnOperation = append(notAnOperation, op)
 	}
-	sort.Strings(missing)
 	sort.Strings(viaAlias)
 
-	if len(missing) > 0 {
-		t.Errorf("%d operations in %s are not reachable through vipsx: %v",
-			len(missing), listName, missing)
+	// The classification alone cannot fail: enumeration breaking would file
+	// everything under aliases, Describe breaking would file everything under
+	// "not an operation", and both read as explanations. These operations are
+	// core, present in every libvips this package supports, and must be
+	// enumerated by name — if one is not, the walk itself is broken, whatever
+	// the classification says.
+	for _, op := range []string{"add", "invert", "resize", "extract_area", "black", "copy", "embed", "gaussblur"} {
+		if !have[op] {
+			t.Errorf("core operation %q is not enumerated; the operation walk is broken", op)
+		}
 	}
+
 	t.Logf("%s: %d entries — %d enumerated, %d callable as aliases (%v), "+
-		"%d not libvips operations, %d unreachable",
+		"%d not libvips operations",
 		listName, len(want),
-		len(want)-len(viaAlias)-len(notAnOperation)-len(missing),
-		len(viaAlias), viaAlias, len(notAnOperation), len(missing))
+		len(want)-len(viaAlias)-len(notAnOperation),
+		len(viaAlias), viaAlias, len(notAnOperation))
 }
 
 func TestCoversVipsgen(t *testing.T) { checkCoverage(t, "vipsgen-8.18.2.txt") }

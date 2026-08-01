@@ -78,9 +78,11 @@ func TestBlockUntrustedIsAccepted(t *testing.T) {
 }
 
 func TestSetPipeReadLimitIsAccepted(t *testing.T) {
-	// -1 is libvips' own "no limit", and is what the suite should be left at.
+	// Restore libvips' actual default, 1 GB. It used to be put back at -1 —
+	// no limit at all — which left the rest of the suite, and anyone copying
+	// this test, looser than a process that never touched the knob.
 	t.Cleanup(func() {
-		if err := vips.SetPipeReadLimit(-1); err != nil {
+		if err := vips.SetPipeReadLimit(1 << 30); err != nil {
 			t.Fatal(err)
 		}
 	})

@@ -59,11 +59,17 @@ func TestStreamsAgainstCLI(t *testing.T) {
 				t.Skip("cannot describe")
 			}
 
+			// Classified by what the buffer argument is, not by the name: an
+			// op like thumbnail_buffer takes a blob without "load" anywhere
+			// in its name, and the name test used to file it as a save, feed
+			// it an argument it does not have, and silently skip it while
+			// counting it saved.
+			bufArg, hasBufArg := spec.Arg("buffer")
 			switch {
-			case suffix == "_source" || (suffix == "_buffer" && strings.Contains(op, "load")):
+			case suffix == "_source" || (suffix == "_buffer" && hasBufArg && bufArg.Input):
 				loads++
 				compareLoad(t, op, base, spec, fixture, dir, kinds, &skipped)
-			case suffix == "_target" || suffix == "_buffer":
+			case suffix == "_target" || (suffix == "_buffer" && hasBufArg && bufArg.Output):
 				saves++
 				compareSave(t, op, base, spec, fixture, dir, kinds, &skipped)
 			default:
