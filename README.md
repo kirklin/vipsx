@@ -184,11 +184,11 @@ can be a file, a byte slice, memory, or any `io.Reader` and `io.Writer`:
 ```go
 src, _ := vips.NewSourceFromReader(req.Body)   // no temporary file
 defer src.Close()
-im, _ := vips.JpegloadSource(src, nil)
+im, _ := vips.LoadSource(src)                  // sniffs content, like LoadFile
 
 target, _ := vips.NewTargetToWriter(w)         // straight to the response
 defer target.Close()
-_ = vips.WebpsaveTarget(im, target, nil)
+_ = vips.SaveTarget(im, target, ".webp", vips.In("Q", 82))
 if err := target.Err(); err != nil { ... }     // what the writer said
 ```
 
@@ -197,6 +197,11 @@ would a real one. A reader that cannot — an HTTP body, a pipe — makes libvip
 take its sequential path and buffer what it needs instead. Both work; the
 seekable one works for more formats, since a few loaders cannot operate without
 seeking.
+
+`LoadSource` picks the loader by sniffing, the same way `LoadFile` does, so the
+format does not have to be known up front — which on a request body is where it
+is least available. `LoaderForSource` and `SaverForTarget` report the choice
+without making it.
 
 `Close` releases the reader or writer on the spot, so it comes after the save:
 evaluate every image loaded from the source first, then close. Demanding bytes
@@ -208,14 +213,126 @@ suite asserts exactly that. `Err` reports what the reader or writer actually
 said when a call failed — libvips' own error says only that reading or writing
 failed — and it keeps answering after Close.
 
+`CopyMemory` is the way out of that ordering when it does not suit. It renders
+the pipeline into memory, which cuts the image's tie to the source, so the
+reader can go back to its owner before anything is saved:
+
+```go
+own, _ := im.CopyMemory()   // pixels are here now
+src.Close()                 // and the body can go back
+```
+
+### Raw pixels
+
+For pixels that did not come from a file — another library's decoder, a
+framebuffer, a Go `image.Image`:
+
+```go
+im, _ := vips.NewImageFromMemory(pix, w, h, 3, vips.BandFormatUchar)
+out, _ := im.WriteToMemory()   // band-packed rows, not an encoding
+```
+
+libvips takes its own copy on the way in, so the slice is free immediately. The
+non-copying constructor is deliberately not exposed: it keeps the caller's
+pointer for the life of the image, and Go memory belongs to a collector that
+may move or reclaim it.
+
+### Deadlines and cancellation
+
+libvips has no notion of a deadline. What it has is progress reporting and a
+kill flag, and tying the two to a `context.Context` is what turns them into one:
+
+```go
+w, _ := im.CancelOn(ctx)
+defer w.Stop()
+
+buf, err := vips.SaveBuffer(im, ".webp")
+if err != nil {
+    if cause := w.Err(); cause != nil {
+        return cause          // context.DeadlineExceeded
+    }
+    return err                // "VipsImage: killed for image temp-58"
+}
+```
+
+`w.Err()` is the point. libvips reports a killed pipeline as a generic failure,
+which says that a pipeline stopped and nothing about why; the reason lives on
+the watch. Cancellation is noticed at the next progress report, so it is prompt
+rather than instant — measured here, a 60 ms deadline on a 600 ms pipeline lands
+within a millisecond or two.
+
+`OnProgress` is the general form, for a progress bar or any other reason to stop:
+
+```go
+w, _ := im.OnProgress(func(p vips.Progress) error {
+    if p.Total > tooManyPixels {
+        return errTooBig
+    }
+    return nil                // or non-nil to stop the evaluation
+})
+```
+
+### Hardening
+
+For a process that decodes images it did not choose:
+
+```go
+vips.BlockUntrusted(true)                   // off with the loaders libvips distrusts
+vips.SetPipeReadLimit(64 << 20)             // cap what an unseekable stream can buffer
+
+vips.BlockOperation("VipsForeignLoad", true)        // nothing loads
+vips.BlockOperation("VipsForeignLoadJpeg", false)   // except what you serve
+vips.BlockOperation("VipsForeignLoadPng", false)
+```
+
+Names here are libvips class names rather than operation nicknames, and blocking
+covers a class and everything under it, which is what makes the deny-all shape
+one call rather than thirty.
+
 ### Runtime controls
 
 ```go
 vips.SetConcurrency(4)     // worker threads per operation
 vips.SetCacheMax(100)      // operations kept for reuse
+vips.SetCacheMaxMem(1<<30) // ... or by bytes
+vips.SetCacheMaxFiles(100) // ... or by descriptors held open
 vips.ClearCache()
 vips.Memory()              // libvips' own allocation counters
 ```
+
+libvips complains through GLib, which writes to stderr — in a service, the one
+place nobody reads. `SetLogHandler` puts those lines with the rest of the logs:
+
+```go
+vips.SetLogHandler(func(domain string, level vips.LogLevel, msg string) {
+    slog.Warn("libvips", "domain", domain, "level", level.String(), "msg", msg)
+})
+```
+
+### Handles, and using one after Close
+
+`Close` on an image, source or target releases it, and using it afterwards
+panics with `*vips.ClosedError` naming the method. That is deliberate: a closed
+handle used to reach libvips as a NULL, which it dereferences, so the mistake
+was a SIGSEGV that took the process down and named neither the image nor the
+caller. The pointer is read and cleared atomically, so a `Close` racing a read
+is a defined panic rather than a read of freed memory.
+
+Passing a closed handle as an *argument* is an error rather than a panic, since
+a call is a value the caller is expected to check.
+
+### Errors under concurrency
+
+libvips keeps one error buffer for the whole process, not one per thread or per
+call. Draining it here is atomic, so nothing is lost, but two operations failing
+at the same moment append to the same place: a message can arrive carrying
+another goroutine's text. Measured with eight goroutines failing repeatedly,
+88% of messages did not name their own call.
+
+Nothing in a binding fixes that while calls run concurrently — pyvips and govips
+read the same buffer the same way. `vips.SetErrorIsolation(true)` serialises
+operations, which takes that number to zero, and is meant for reproducing a
+problem rather than for serving traffic.
 
 ### A supplied argument is always sent
 
@@ -404,17 +521,31 @@ path has to change with the installed version.
 
 ## Status
 
-Not ready for production. The design is verified but the mileage is not: this
-has run on one machine against one libvips version, with no external review and
-no production hours, against govips' years of service and vipsgen's use inside
-imagor. The CI matrix above is written and unexecuted until this repository has a
-remote.
+Not ready for production, and the reason is mileage rather than surface. This
+has no production hours behind it, against govips' years of service and
+vipsgen's use inside imagor. No amount of code closes that gap; only running it
+does.
 
 What is done: the generic call path, the generated typed layer, metadata,
-sources and targets, the differential oracle, and the leak suite. What is left
-before anyone should ship it: green CI on Linux, ASan and Valgrind actually run
-rather than merely configured, and `io.Reader`/`io.Writer` streaming, which needs
-callbacks into Go and is not the same job as the file and memory sources here.
+`io.Reader`/`io.Writer` streaming with content sniffing, raw pixels in and out,
+deadlines and cancellation, the hardening switches, the differential oracle and
+the leak suite.
+
+What is left before anyone should ship it:
+
+- **The CI matrix run rather than written.** Three libvips versions, ASan and
+  Valgrind actually executed. Until that happens, "one binding, any version" is
+  a claim about a file in `.github/`.
+- **A stability promise.** This is v0, so the API can still move. v1 and a
+  statement about what v1 means is worth more to a prospective user than another
+  function.
+- **Hours.** Somebody's real traffic, for long enough that the numbers mean
+  something, with `vips.Memory()` watched across it.
+
+Two limitations are properties of libvips rather than gaps here, and are
+documented above rather than listed as work: error messages cannot be attributed
+under concurrency without serialising calls, and cancellation is noticed at the
+next progress report rather than instantly.
 
 ## License
 
