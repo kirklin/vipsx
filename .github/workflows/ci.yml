@@ -187,7 +187,12 @@ jobs:
 
       - name: The regenerated layer must build and pass its tests
         run: |
-          gofmt -l vips/zz_generated_ops.go vips/zz_generated_enums.go
+          unformatted=$(gofmt -l vips/zz_generated_ops.go vips/zz_generated_enums.go)
+          if [ -n "$unformatted" ]; then
+            echo "regenerated files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
           go build ./...
           go test ./vips/ -count=1
 

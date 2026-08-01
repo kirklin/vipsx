@@ -2,8 +2,12 @@
 # life of the process on purpose. Those are reachable, not lost, but the leak
 # checker cannot tell the difference from outside, so name them here.
 #
-# Anything not listed is a genuine leak in this binding's own reference
-# counting, which is the only thing this check exists to find.
+# A pattern matches anywhere in the stack, so the allocator entries below —
+# g_malloc and friends — also hide any leak of this binding's own that was
+# allocated through GLib. That is the price of running against GLib at all:
+# what this check can genuinely find is a leak on a plain malloc/strdup path,
+# which is what the C core mostly uses. Leaks of libvips-allocated memory are
+# covered by internal/soak against libvips' own counters instead.
 
 leak:g_type_register
 leak:g_type_class_ref

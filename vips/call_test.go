@@ -353,6 +353,26 @@ func TestNoUnknownArgumentKinds(t *testing.T) {
 	}
 }
 
+// Bits outside a flags type are rejected here because GLib will not reject
+// them: property validation masks unknown bits off silently, so a typo'd flag
+// would simply not happen, with nothing saying so.
+func TestFlagsBitsAreValidated(t *testing.T) {
+	im := load(t, "noise.png")
+
+	// "keep" on jpegsave_buffer is VipsForeignKeep. Send a bit far outside it.
+	_, err := vips.Call("jpegsave_buffer", vips.In("in", im), vips.In("keep", 1<<20))
+	if err == nil {
+		t.Fatal("a flags value with bits outside the type was accepted")
+	}
+
+	// A legitimate combination still goes through.
+	outs, err := vips.Call("jpegsave_buffer", vips.In("in", im), vips.In("keep", 0))
+	if err != nil {
+		t.Fatalf("keep=0 rejected: %v", err)
+	}
+	outs.Close()
+}
+
 func TestEnumValues(t *testing.T) {
 	vals := vips.EnumValues("VipsInteresting")
 	if len(vals) == 0 {

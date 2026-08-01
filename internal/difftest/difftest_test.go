@@ -448,6 +448,12 @@ func bindingIsStable(t *testing.T, p plan, dir string, first string) (bool, floa
 	const reruns = 5
 	worst := 0.0
 	for i := range reruns {
+		// Without this the re-run is a cache hit: same operation, same input
+		// object, same arguments hand back the same output object, and the
+		// comparison measures nothing. An unstable binding would have been
+		// classified stable by construction.
+		vips.ClearCache()
+
 		again := filepath.Join(dir, fmt.Sprintf("%s.gorecheck%d.png", p.op, i))
 
 		args := p.callArgs

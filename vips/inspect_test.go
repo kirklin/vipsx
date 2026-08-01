@@ -17,7 +17,11 @@ import (
 func TestOrientationSwaps(t *testing.T) {
 	im := load(t, "noise.png")
 
-	own, err := im.CopyMemory()
+	// Copy, not CopyMemory: the loaded image is shared through the operation
+	// cache, and CopyMemory of an already-materialised image returns the same
+	// object — this test once wrote orientation=8 through exactly that alias
+	// and poisoned every later load of the fixture.
+	own, err := vips.Copy(im, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

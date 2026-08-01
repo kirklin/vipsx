@@ -118,17 +118,19 @@ site:
 # anything hand-written calls a generated function, the package stops compiling
 # the moment the generated files are removed — which is exactly when the
 # generator is about to write them. Strip did this once, by calling Copy.
+# The generated files are parked in a fresh mktemp directory and restored by a
+# trap, so an interrupt cannot strand the only copy, and two checkouts running
+# this at once cannot fight over a fixed path.
 check-bootstrap:
-	@mkdir -p /tmp/vipsx-generated
-	@cp vips/zz_generated_*.go /tmp/vipsx-generated/
-	@rm -f vips/zz_generated_*.go
-	@if go build ./vips/ 2>/tmp/vipsx-bootstrap.log; then \
-		cp /tmp/vipsx-generated/zz_generated_*.go vips/; \
+	@tmp=$$(mktemp -d); \
+	cp vips/zz_generated_*.go "$$tmp"/; \
+	trap 'cp "$$tmp"/zz_generated_*.go vips/ 2>/dev/null; rm -rf "$$tmp"' EXIT; \
+	rm -f vips/zz_generated_*.go; \
+	if go build ./vips/ 2>"$$tmp"/bootstrap.log; then \
 		echo "the core compiles without the generated layer"; \
 	else \
-		cp /tmp/vipsx-generated/zz_generated_*.go vips/; \
 		echo "the core does not compile without the generated layer:"; \
-		grep -m5 "undefined" /tmp/vipsx-bootstrap.log || cat /tmp/vipsx-bootstrap.log; \
+		grep -m5 "undefined" "$$tmp"/bootstrap.log || cat "$$tmp"/bootstrap.log; \
 		echo "something hand-written is calling generated code, which leaves the"; \
 		echo "generator unable to run."; \
 		exit 1; \
@@ -137,8 +139,10 @@ check-bootstrap:
 # Fails if the demonstration images have leaked into the module.
 check-module-size:
 	@test -f site/go.mod || (echo "site/go.mod is missing" && exit 1)
-	@go list ./... | grep -q '/site' && \
-		(echo "site is part of the module; its images would ship to consumers" && exit 1) || true
+	@if go list ./... | grep -q '/site'; then \
+		echo "site is part of the module; its images would ship to consumers"; \
+		exit 1; \
+	fi
 	@echo "site/ is a separate module and stays out of the module zip"
 
 # Rebuild the typed layer from the installed libvips.

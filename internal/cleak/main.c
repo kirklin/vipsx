@@ -16,8 +16,12 @@
 //
 //	make cleak
 //
-// Pass --leak to make it lose memory on purpose, which is how CI proves the
-// checker is switched on before believing a clean report.
+// Pass --leak to make it lose memory on purpose, which is how the Makefile
+// target proves the checker is switched on before believing a clean report.
+// On GitHub's hosted runners that probe fails — LeakSanitizer is silently
+// inert there — so the CI job runs the AddressSanitizer half only and says
+// so. The leak half runs where the probe passes: locally on Linux, or in the
+// container behind `make docker-cleak`.
 
 #include "vipsx.h"
 

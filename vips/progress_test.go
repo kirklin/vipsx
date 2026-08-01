@@ -106,7 +106,16 @@ func TestCancelOnDeadlineStopsEvaluation(t *testing.T) {
 }
 
 func TestCancelOnAlreadyCancelledContext(t *testing.T) {
-	im := black(t, 1000, 1000)
+	// Like the other cancellation tests: a cached result skips evaluation
+	// entirely, and with no evaluation there is no progress report and no
+	// kill. The clear keeps the assertion about cancellation rather than
+	// about whether some earlier test happened to compute the same thing.
+	vips.ClearCache()
+
+	// Big enough that evaluation always emits progress reports before it can
+	// finish; a small image can complete inside its first work unit, and a
+	// kill that lands after the last unit stops nothing.
+	im := black(t, 8000, 8000)
 	defer im.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -123,6 +132,28 @@ func TestCancelOnAlreadyCancelledContext(t *testing.T) {
 	}
 	if _, err := vips.Avg(im); err == nil {
 		t.Fatal("evaluation ran under a context that was already done")
+	}
+}
+
+// Asking must not disarm: vips_image_iskilled consumes the flag it reports,
+// and an unshimmed Killed() once did too — Kill, Killed, Killed read true then
+// false with the kill silently gone.
+func TestKilledIsNotADestructiveRead(t *testing.T) {
+	// A private image, and the cache dropped afterwards: the armed kill flag
+	// stays on the underlying object, which identical cached calls share, and
+	// leaving it up would fail the next test to evaluate the same black.
+	vips.ClearCache()
+	t.Cleanup(vips.ClearCache)
+
+	im := black(t, 63, 63)
+	defer im.Close()
+
+	im.Kill()
+	if !im.Killed() {
+		t.Fatal("Killed() is false right after Kill()")
+	}
+	if !im.Killed() {
+		t.Fatal("the first Killed() consumed the kill flag")
 	}
 }
 
