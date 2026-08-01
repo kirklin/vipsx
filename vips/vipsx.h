@@ -173,6 +173,8 @@ const char *vipsx_find_load(const char *filename);
 const char *vipsx_find_load_buffer(const void *buf, size_t len);
 const char *vipsx_find_save(const char *filename);
 const char *vipsx_find_save_buffer(const char *suffix);
+const char *vipsx_find_load_source(VipsSource *source);
+const char *vipsx_find_save_target(const char *suffix);
 
 // Image helpers that are pure plumbing rather than operations.
 void vipsx_image_unref(VipsImage *image);

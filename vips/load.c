@@ -30,3 +30,13 @@ const char *vipsx_find_save(const char *filename) {
 const char *vipsx_find_save_buffer(const char *suffix) {
   return vips_foreign_find_save_buffer(suffix);
 }
+
+// The stream pair. Sniffing a source rewinds it afterwards, so the loader that
+// runs next still reads from the start.
+const char *vipsx_find_load_source(VipsSource *source) {
+  return vips_foreign_find_load_source(source);
+}
+
+const char *vipsx_find_save_target(const char *suffix) {
+  return vips_foreign_find_save_target(suffix);
+}
