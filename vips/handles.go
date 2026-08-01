@@ -10,22 +10,26 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"sync/atomic"
+	"sync"
 	"unsafe"
 )
 
 // handle is the shared body of the non-image GObjects an operation can take as
 // an argument. They follow the same rule as Image: one reference, dropped by
-// Close or by the collector, and read atomically so a Close racing a use is a
-// defined *ClosedError rather than a read of freed memory.
+// Close or by the collector, and every use takes its own reference under a
+// lock, so a Close racing a use is a defined *ClosedError or a completed call
+// rather than a read of freed memory.
 type handle struct {
-	ptr     atomic.Pointer[C.GObject]
+	mu      sync.Mutex
+	ptr     *C.GObject // guarded by mu; nil once closed
 	cleanup runtime.Cleanup
 }
 
 func (h *handle) init(p unsafe.Pointer) {
 	cp := (*C.GObject)(p)
-	h.ptr.Store(cp)
+	h.mu.Lock()
+	h.ptr = cp
+	h.mu.Unlock()
 	h.cleanup = runtime.AddCleanup(h, func(ptr *C.GObject) {
 		if shutdownDone.Load() {
 			return
@@ -38,33 +42,46 @@ func (h *handle) close() {
 	if h == nil {
 		return
 	}
-	p := h.ptr.Swap(nil)
+	h.mu.Lock()
+	p := h.ptr
+	h.ptr = nil
+	h.mu.Unlock()
 	if p == nil {
 		return
 	}
 	h.cleanup.Stop()
 	C.vipsx_object_unref(unsafe.Pointer(p))
-	runtime.KeepAlive(h)
 }
 
-// live returns the wrapped object, or panics if the handle is closed. See
-// (*Image).live for why this is a panic and not a NULL passed along.
-func (h *handle) live(op string) unsafe.Pointer {
-	if h == nil {
-		panic(&ClosedError{Op: op})
-	}
-	p := h.ptr.Load()
+// acquire returns the wrapped object with an extra reference held, or panics
+// if the handle is closed. See (*Image).acquire for why this is a panic and
+// not a NULL passed along, and why the reference is taken at all.
+func (h *handle) acquire(op string) unsafe.Pointer {
+	p := h.acquireObject()
 	if p == nil {
 		panic(&ClosedError{Op: op})
 	}
-	return unsafe.Pointer(p)
+	return p
 }
 
-func (h *handle) cPointer() unsafe.Pointer {
+// release drops the reference acquire took.
+func (h *handle) release(p unsafe.Pointer) {
+	C.vipsx_object_unref(p)
+}
+
+// acquireObject implements cObject: nil when closed, otherwise the object with
+// an extra reference the caller must release.
+func (h *handle) acquireObject() unsafe.Pointer {
 	if h == nil {
 		return nil
 	}
-	return unsafe.Pointer(h.ptr.Load())
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.ptr == nil {
+		return nil
+	}
+	C.vipsx_object_ref(unsafe.Pointer(h.ptr))
+	return unsafe.Pointer(h.ptr)
 }
 
 // Interpolate is a resampling method, taken by operations such as affine and
@@ -96,14 +113,11 @@ func (i *Interpolate) Close() { i.close() }
 // _source take one.
 type Source struct {
 	handle
-	// st is non-nil when the bytes come from an io.Reader. It lives on the
-	// handle rather than only in the registry so Err keeps working after
-	// Close; the registry entry itself lasts as long as the C object does.
+	// st is non-nil when the bytes come from an io.Reader or a descriptor. It
+	// lives on the handle rather than only in the registry so Err keeps
+	// working after Close; the registry entry itself lasts as long as the C
+	// object does, which for a descriptor is also what pins the *os.File.
 	st *stream
-	// file is non-nil when the source reads a descriptor. libvips neither dups
-	// nor closes it, so holding the *os.File here is what stops a collector
-	// closing the descriptor out from under libvips.
-	file *os.File
 }
 
 // NewSourceFromFile opens a file as a source.
@@ -151,9 +165,11 @@ func NewSourceFromBytes(data []byte) (*Source, error) {
 // descriptor directly.
 //
 // libvips neither duplicates nor closes the descriptor, so f must stay open for
-// as long as the source is used, and closing it stays the caller's job. The
-// source holds a reference to f so a collector cannot close it early; that is
-// the one part the caller does not have to think about.
+// as long as the source is used, and closing it stays the caller's job. What
+// is not the caller's job is keeping f referenced: the registry pins it for
+// exactly as long as libvips can still demand bytes — even after this handle
+// and every image loaded from it have been dropped — so the collector cannot
+// finalize the os.File and close the descriptor out from under a pipeline.
 //
 //	f, err := os.Open("photo.jpg")
 //	if err != nil { return err }
@@ -169,11 +185,15 @@ func NewSourceFromOpenFile(f *os.File) (*Source, error) {
 	if f == nil {
 		return nil, &Error{Op: "source", Message: "nil file"}
 	}
-	p := C.vipsx_source_new_from_descriptor(C.int(f.Fd()))
+	st := &stream{file: f}
+	id := registerStream(st)
+	p := C.vipsx_source_new_from_descriptor_pinned(C.int(f.Fd()), C.guint64(id))
 	if p == nil {
+		// No object was made, so no weak reference will ever fire.
+		unregisterStream(id)
 		return nil, &Error{Op: "source", Message: lastError()}
 	}
-	s := &Source{file: f}
+	s := &Source{st: st}
 	s.init(unsafe.Pointer(p))
 	return s, nil
 }
@@ -185,8 +205,8 @@ func NewSourceFromOpenFile(f *os.File) (*Source, error) {
 // stricter than the loaders libvips is willing to try. It reports an error when
 // the source is shorter than n.
 func (s *Source) Sniff(n int) ([]byte, error) {
-	p := s.live("Source.Sniff")
-	defer runtime.KeepAlive(s)
+	p := s.acquire("Source.Sniff")
+	defer s.release(p)
 	if n <= 0 {
 		return nil, &Error{Op: "source", Message: "sniff length must be positive"}
 	}
@@ -203,8 +223,8 @@ func (s *Source) Sniff(n int) ([]byte, error) {
 //
 // A cheap first gate for a size limit, before any decoding happens.
 func (s *Source) Length() int64 {
-	p := s.live("Source.Length")
-	defer runtime.KeepAlive(s)
+	p := s.acquire("Source.Length")
+	defer s.release(p)
 	return int64(C.vipsx_source_length((*C.VipsSource)(p)))
 }
 
@@ -213,15 +233,15 @@ func (s *Source) Length() int64 {
 //
 // For a process juggling more sources than it has descriptors.
 func (s *Source) Minimise() {
-	p := s.live("Source.Minimise")
-	defer runtime.KeepAlive(s)
+	p := s.acquire("Source.Minimise")
+	defer s.release(p)
 	C.vipsx_source_minimise((*C.VipsSource)(p))
 }
 
 // Unminimise undoes Minimise, reopening ahead of a read rather than during one.
 func (s *Source) Unminimise() {
-	p := s.live("Source.Unminimise")
-	defer runtime.KeepAlive(s)
+	p := s.acquire("Source.Unminimise")
+	defer s.release(p)
 	C.vipsx_source_unminimise((*C.VipsSource)(p))
 }
 
@@ -256,11 +276,11 @@ func (s *Source) Err() error {
 type Target struct {
 	handle
 	memory bool
-	// st is non-nil when the bytes go to an io.Writer. On the handle rather
-	// than only in the registry so Err keeps working after Close.
+	// st is non-nil when the bytes go to an io.Writer or a descriptor. On the
+	// handle rather than only in the registry so Err keeps working after
+	// Close; for a descriptor the registry entry is also what pins the
+	// *os.File. See Source.st.
 	st *stream
-	// file is non-nil when the target writes to a descriptor; see Source.file.
-	file *os.File
 }
 
 // NewTargetToFile creates a target writing to a file.
@@ -297,7 +317,7 @@ func NewTargetToMemory() (*Target, error) {
 
 // NewTargetToOpenFile writes an image through an already-open file's
 // descriptor. See NewSourceFromOpenFile for what libvips does and does not do
-// with it.
+// with it, and for how long f stays pinned.
 func NewTargetToOpenFile(f *os.File) (*Target, error) {
 	if err := Startup(); err != nil {
 		return nil, err
@@ -305,11 +325,14 @@ func NewTargetToOpenFile(f *os.File) (*Target, error) {
 	if f == nil {
 		return nil, &Error{Op: "target", Message: "nil file"}
 	}
-	p := C.vipsx_target_new_to_descriptor(C.int(f.Fd()))
+	st := &stream{file: f}
+	id := registerStream(st)
+	p := C.vipsx_target_new_to_descriptor_pinned(C.int(f.Fd()), C.guint64(id))
 	if p == nil {
+		unregisterStream(id)
 		return nil, &Error{Op: "target", Message: lastError()}
 	}
-	t := &Target{file: f}
+	t := &Target{st: st}
 	t.init(unsafe.Pointer(p))
 	return t, nil
 }
@@ -320,8 +343,8 @@ func NewTargetToOpenFile(f *os.File) (*Target, error) {
 // The bytes are copied rather than stolen, so calling this twice returns the
 // same content twice rather than nothing the second time.
 func (t *Target) Bytes() ([]byte, error) {
-	p := t.live("Target.Bytes")
-	defer runtime.KeepAlive(t)
+	p := t.acquire("Target.Bytes")
+	defer t.release(p)
 	if !t.memory {
 		return nil, &Error{Op: "target", Message: "not a memory target"}
 	}

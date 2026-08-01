@@ -78,3 +78,29 @@ VipsTargetCustom *vipsx_target_custom_new(guint64 id) {
 
   return target;
 }
+
+// Descriptor-backed sources and targets, reported to the registry the same way.
+//
+// libvips neither dups nor closes the descriptor, so the *os.File behind it
+// must stay referenced for as long as libvips can still demand bytes — which
+// is the life of this C object, not the life of the Go wrapper. A lazy image
+// keeps the source alive through C references the Go collector cannot see, so
+// without the weak ref the wrapper could be collected, the *os.File finalized,
+// and the descriptor closed while a pipeline still reads it: EBADF at best,
+// and after descriptor reuse, another file's bytes at worst. The registry
+// entry pins the file; the weak ref removes the pin when libvips lets go.
+VipsSource *vipsx_source_new_from_descriptor_pinned(int fd, guint64 id) {
+  VipsSource *source = vips_source_new_from_descriptor(fd);
+  if (source)
+    g_object_weak_ref(G_OBJECT(source), vipsx_stream_gone,
+                      GSIZE_TO_POINTER((gsize)id));
+  return source;
+}
+
+VipsTarget *vipsx_target_new_to_descriptor_pinned(int fd, guint64 id) {
+  VipsTarget *target = vips_target_new_to_descriptor(fd);
+  if (target)
+    g_object_weak_ref(G_OBJECT(target), vipsx_stream_gone,
+                      GSIZE_TO_POINTER((gsize)id));
+  return target;
+}

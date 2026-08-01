@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
@@ -32,12 +33,20 @@ func (e *ClosedError) Error() string {
 // Constructing one is cheap and does no decoding; work happens when pixels are
 // finally demanded, typically by a save operation.
 //
-// The handle itself is safe to use from several goroutines: the pointer is read
-// and cleared atomically, so a Close racing a read cannot produce a torn value.
-// That makes the race well defined rather than harmless — a read that loses
-// panics with *ClosedError instead of reading freed memory.
+// The handle is safe to use from several goroutines, Close included. Every
+// method takes its own reference on the underlying object before entering C
+// and drops it afterwards, so a Close racing a call either loses — the call
+// finishes on its own reference and the object is freed when the last
+// reference goes — or wins, in which case the call panics with *ClosedError.
+// Neither path reads freed memory. What stays the caller's problem is meaning:
+// an image is a lazy pipeline, and evaluating one from two goroutines at once
+// is not safe; see CopyMemory.
 type Image struct {
-	ptr     atomic.Pointer[C.VipsImage]
+	// mu makes taking a reference and revoking the handle mutually exclusive.
+	// An atomic pointer alone cannot: between loading the pointer and reffing
+	// it, a concurrent Close could drop the last reference and free the object.
+	mu      sync.Mutex
+	ptr     *C.VipsImage // guarded by mu; nil once closed
 	cleanup runtime.Cleanup
 
 	// watch is the attached progress handler, if any. It lives here so Close
@@ -53,8 +62,7 @@ func wrapImage(p unsafe.Pointer) *Image {
 		return nil
 	}
 	cp := (*C.VipsImage)(p)
-	im := &Image{}
-	im.ptr.Store(cp)
+	im := &Image{ptr: cp}
 	im.cleanup = runtime.AddCleanup(im, func(ptr *C.VipsImage) {
 		// There is nothing left to release once libvips has been shut down,
 		// and the collector is free to run this afterwards.
@@ -80,67 +88,86 @@ func (im *Image) Close() {
 	// Detach before the object goes: the handler holds signal ids on it.
 	im.watch.Load().Stop()
 
-	// Swap is the claim: exactly one caller can take the pointer away, so it
-	// doubles as the once-only guard the separate flag used to provide.
-	p := im.ptr.Swap(nil)
+	// Taking the pointer under the lock is the claim: exactly one caller gets
+	// it, and no acquire can slip between the take and the unref.
+	im.mu.Lock()
+	p := im.ptr
+	im.ptr = nil
+	im.mu.Unlock()
 	if p == nil {
 		return
 	}
 	im.cleanup.Stop()
 	C.vipsx_image_unref(p)
-	runtime.KeepAlive(im)
 }
 
-// live returns the underlying VipsImage, or panics if the handle is closed.
+// acquire returns the underlying VipsImage with an extra reference held, or
+// panics if the handle is closed. Every method that hands the pointer to C
+// goes through here and drops the reference with release once C has returned.
 //
-// Every method that hands the pointer to C goes through here. Passing the NULL
-// along instead is not an option: libvips reads through it, so a use-after-close
-// became a SIGSEGV that took the process with it and named neither the image
-// nor the caller.
-func (im *Image) live(op string) *C.VipsImage {
-	if im == nil {
-		panic(&ClosedError{Op: op})
-	}
-	p := im.ptr.Load()
+// The reference is what makes a concurrent Close defined: Close revokes the
+// handle, but it cannot free an object a call is still using. Passing a NULL
+// along instead of panicking is not an option: libvips reads through it, so a
+// use-after-close became a SIGSEGV that took the process with it and named
+// neither the image nor the caller.
+func (im *Image) acquire(op string) *C.VipsImage {
+	p := im.tryAcquire()
 	if p == nil {
 		panic(&ClosedError{Op: op})
 	}
 	return p
 }
 
-// cPointer reports the underlying pointer, or nil when the handle is closed.
-//
-// Unlike live this does not panic: it feeds argument marshalling, which turns a
-// closed handle into a returned error naming the argument.
-func (im *Image) cPointer() unsafe.Pointer {
+// tryAcquire is acquire without the panic: nil means the handle is closed.
+// It feeds argument marshalling, which turns a closed handle into a returned
+// error naming the argument.
+func (im *Image) tryAcquire() *C.VipsImage {
 	if im == nil {
 		return nil
 	}
-	return unsafe.Pointer(im.ptr.Load())
+	im.mu.Lock()
+	defer im.mu.Unlock()
+	if im.ptr == nil {
+		return nil
+	}
+	C.vipsx_object_ref(unsafe.Pointer(im.ptr))
+	return im.ptr
+}
+
+// release drops the reference acquire took.
+func (im *Image) release(p *C.VipsImage) {
+	C.vipsx_image_unref(p)
+}
+
+// acquireObject implements cObject; see marshal.
+func (im *Image) acquireObject() unsafe.Pointer {
+	return unsafe.Pointer(im.tryAcquire())
 }
 
 // Width reports the image width in pixels.
 func (im *Image) Width() int {
-	p := im.live("Width")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Width")
+	defer im.release(p)
 	return int(C.vipsx_image_width(p))
 }
 
 // Height reports the image height in pixels.
 func (im *Image) Height() int {
-	p := im.live("Height")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Height")
+	defer im.release(p)
 	return int(C.vipsx_image_height(p))
 }
 
 // Bands reports the number of bands per pixel.
 func (im *Image) Bands() int {
-	p := im.live("Bands")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Bands")
+	defer im.release(p)
 	return int(C.vipsx_image_bands(p))
 }
 
 // cObject is implemented by handles that wrap a GObject-derived pointer.
+// acquireObject returns the pointer with an extra reference held, or nil when
+// the handle is closed; the caller releases with vipsx_object_unref.
 type cObject interface {
-	cPointer() unsafe.Pointer
+	acquireObject() unsafe.Pointer
 }

@@ -64,6 +64,12 @@ type ArgSpec struct {
 	Output     bool
 	Deprecated bool
 
+	// Modify means the operation writes into this argument in place instead of
+	// producing an output — the draw family is the whole population. Call
+	// answers it by substituting a private copy and returning that copy among
+	// the outputs, so the argument the caller passed is never touched.
+	Modify bool
+
 	// Default is the value libvips uses when this argument is omitted, or nil
 	// when the type has no meaningful default. It is here for documentation and
 	// code generation only. The call path never reads it: a supplied argument
@@ -164,6 +170,7 @@ func Describe(operation string) (*OpSpec, error) {
 				Input:      flags&C.VIPSX_FLAG_INPUT != 0,
 				Output:     flags&C.VIPSX_FLAG_OUTPUT != 0,
 				Deprecated: flags&C.VIPSX_FLAG_DEPRECATED != 0,
+				Modify:     flags&C.VIPSX_FLAG_MODIFY != 0,
 			}
 			if ca.has_default != 0 {
 				a.Default = decodeDefault(a.Kind, ca)

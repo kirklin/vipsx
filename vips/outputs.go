@@ -12,6 +12,12 @@ func (o Outputs) Image(name string) (*Image, error) {
 // their integer value.
 func (o Outputs) Int(name string) (int, error) { return get[int](o, name) }
 
+// Int64 returns a named output as an int64, which is how 64-bit integer
+// outputs arrive. No operation in libvips 8.18 produces one; the accessor
+// exists so that one appearing in a newer libvips is readable rather than
+// stuck behind a type assertion that can never pass.
+func (o Outputs) Int64(name string) (int64, error) { return get[int64](o, name) }
+
 // Float returns a named output as a float64.
 func (o Outputs) Float(name string) (float64, error) { return get[float64](o, name) }
 
@@ -33,18 +39,29 @@ func (o Outputs) Floats(name string) ([]float64, error) { return get[[]float64](
 // Images returns a named output as an image slice. The caller owns each image.
 func (o Outputs) Images(name string) ([]*Image, error) { return get[[]*Image](o, name) }
 
-// Close releases every image in the set. Useful when an error path needs to
-// discard a whole result.
+// Close releases every handle in the set — images, sources, targets and
+// interpolators alike. Useful when an error path needs to discard a whole
+// result.
 func (o Outputs) Close() {
 	for _, v := range o {
-		switch x := v.(type) {
-		case *Image:
-			x.Close()
-		case []*Image:
-			for _, im := range x {
-				im.Close()
-			}
+		closeOutput(v)
+	}
+}
+
+func closeOutput(v any) {
+	switch x := v.(type) {
+	case *Image:
+		x.Close()
+	case []*Image:
+		for _, im := range x {
+			im.Close()
 		}
+	case *Source:
+		x.Close()
+	case *Target:
+		x.Close()
+	case *Interpolate:
+		x.Close()
 	}
 }
 

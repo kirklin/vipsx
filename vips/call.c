@@ -310,6 +310,15 @@ int vipsx_call(const char *operation, VipsxArg *args, int n_args,
 
   for (int i = 0; i < n_outs; i++) {
     if (vipsx_get_one(op, &outs[i]) != 0) {
+      // vipsx_out_clear frees heap memory but leaves the references in .p
+      // alone, because on success those transfer to Go. Here nothing
+      // transfers: drop them, or each leaks with its whole pipeline.
+      for (int k = 0; k < i; k++) {
+        if (outs[k].p) {
+          g_object_unref(outs[k].p);
+          outs[k].p = NULL;
+        }
+      }
       vipsx_out_clear(outs, i);
       vips_object_unref_outputs(VIPS_OBJECT(op));
       g_object_unref(op);

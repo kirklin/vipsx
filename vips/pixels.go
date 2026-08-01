@@ -8,9 +8,33 @@ import "C"
 
 import (
 	"fmt"
+	"math"
+	"math/bits"
 	"runtime"
 	"unsafe"
 )
+
+// pixelBytes multiplies image dimensions without wrapping. The dimensions are
+// the caller's to choose, and a product that overflowed into something small
+// would pass the length check and send libvips reading past the buffer.
+func pixelBytes(width, height, bands, sizeof int) (int, bool) {
+	if sizeof <= 0 {
+		return 0, false
+	}
+	hi, n := bits.Mul64(uint64(width), uint64(height))
+	if hi != 0 {
+		return 0, false
+	}
+	hi, n = bits.Mul64(n, uint64(bands))
+	if hi != 0 {
+		return 0, false
+	}
+	hi, n = bits.Mul64(n, uint64(sizeof))
+	if hi != 0 || n > math.MaxInt {
+		return 0, false
+	}
+	return int(n), true
+}
 
 // FormatSizeof reports how many bytes one band of one pixel takes in the given
 // band format. Multiply by bands and by width×height for a raw buffer's size.
@@ -58,7 +82,14 @@ func NewImageFromMemory(data []byte, width, height, bands int, format int) (*Ima
 		}
 	}
 
-	want := width * height * bands * FormatSizeof(format)
+	want, ok := pixelBytes(width, height, bands, FormatSizeof(format))
+	if !ok {
+		return nil, &Error{
+			Op: "new_from_memory",
+			Message: fmt.Sprintf("%dx%d with %d bands of format %d does not fit in memory",
+				width, height, bands, format),
+		}
+	}
 	if len(data) < want {
 		return nil, &Error{
 			Op: "new_from_memory",
@@ -86,8 +117,8 @@ func NewImageFromMemory(data []byte, width, height, bands int, format int) (*Ima
 // The whole image is computed and held at once, so the answer is as large as
 // width×height×bands×FormatSizeof — check before calling it on something big.
 func (im *Image) WriteToMemory() ([]byte, error) {
-	p := im.live("WriteToMemory")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("WriteToMemory")
+	defer im.release(p)
 
 	var size C.size_t
 	buf := C.vipsx_image_write_to_memory(p, &size)
@@ -119,10 +150,15 @@ func (im *Image) WriteToMemory() ([]byte, error) {
 // a memory image is. Copying is what makes an image shareable.
 //
 // libvips refs and returns the same image when it is already a memory area, so
-// calling this on something already materialised costs nothing.
+// calling this on something already materialised costs nothing. That economy
+// is also the caveat: the "copy" can be the same object, so this is not a way
+// to get a private image to mutate. Metadata written through such an alias
+// lands on the original — and on every other holder, since identical calls
+// served from the operation cache share their result. To mutate, take a real
+// copy first: Copy from the generated layer, or Call("copy") from this one.
 func (im *Image) CopyMemory() (*Image, error) {
-	p := im.live("CopyMemory")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("CopyMemory")
+	defer im.release(p)
 
 	out := C.vipsx_image_copy_memory(p)
 	if out == nil {
@@ -158,8 +194,8 @@ func (im *Image) WithPixels(fn func([]byte) error) error {
 	if fn == nil {
 		return &Error{Op: "get_data", Message: "nil callback"}
 	}
-	p := im.live("WithPixels")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("WithPixels")
+	defer im.release(p)
 
 	data := C.vipsx_image_get_data(p)
 	if data == nil {

@@ -33,7 +33,14 @@ func (a *arena) alloc(n int) unsafe.Pointer {
 	if n < 1 {
 		n = 1 // never hand libvips a null base pointer
 	}
-	return a.track(C.malloc(C.size_t(n)))
+	p := C.malloc(C.size_t(n))
+	if p == nil {
+		// The same exhaustion makes C.CString panic, so a panic keeps the two
+		// failure modes alike. Unchecked, the nil would surface later as a
+		// write through a bad pointer with nothing pointing back here.
+		panic("vips: out of memory marshalling arguments")
+	}
+	return a.track(p)
 }
 
 func (a *arena) ints(xs []int) (unsafe.Pointer, C.size_t) {

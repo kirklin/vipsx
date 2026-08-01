@@ -7,7 +7,6 @@ package vips
 import "C"
 
 import (
-	"runtime"
 	"sort"
 	"unsafe"
 )
@@ -25,16 +24,16 @@ import (
 //	    w, h = h, w
 //	}
 func (im *Image) OrientationSwaps() bool {
-	p := im.live("OrientationSwaps")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("OrientationSwaps")
+	defer im.release(p)
 	return C.vipsx_image_get_orientation_swap(p) != 0
 }
 
 // GuessFormat reports the band format libvips would use for this image if it
 // had to choose, which is not always the one it currently carries.
 func (im *Image) GuessFormat() int {
-	p := im.live("GuessFormat")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("GuessFormat")
+	defer im.release(p)
 	return int(C.vipsx_image_guess_format(p))
 }
 
@@ -42,16 +41,16 @@ func (im *Image) GuessFormat() int {
 // from band count and format rather than read from the header. Useful when a
 // loader left the interpretation unset or wrong.
 func (im *Image) GuessInterpretation() int {
-	p := im.live("GuessInterpretation")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("GuessInterpretation")
+	defer im.release(p)
 	return int(C.vipsx_image_guess_interpretation(p))
 }
 
 // Filename reports where this image was loaded from, or "" for one that was
 // not loaded from a file. Worth putting in an error message.
 func (im *Image) Filename() string {
-	p := im.live("Filename")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Filename")
+	defer im.release(p)
 	return C.GoString(C.vipsx_image_get_filename(p))
 }
 
@@ -60,8 +59,8 @@ func (im *Image) Filename() string {
 // libvips keeps its own note of what was applied, which is a better answer to
 // "how did this image get like this" than anything reconstructed afterwards.
 func (im *Image) History() string {
-	p := im.live("History")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("History")
+	defer im.release(p)
 	return C.GoString(C.vipsx_image_get_history(p))
 }
 
@@ -72,16 +71,16 @@ func (im *Image) History() string {
 // For a process holding many images at once, this is the difference between
 // running out of descriptors and not.
 func (im *Image) Minimise() {
-	p := im.live("Minimise")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Minimise")
+	defer im.release(p)
 	C.vipsx_image_minimise_all(p)
 }
 
 // Invalidate throws away any pixels cached for this image, so the next demand
 // recomputes them. This is what to call when the file underneath has changed.
 func (im *Image) Invalidate() {
-	p := im.live("Invalidate")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Invalidate")
+	defer im.release(p)
 	C.vipsx_image_invalidate_all(p)
 }
 

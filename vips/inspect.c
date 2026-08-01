@@ -112,19 +112,6 @@ void vipsx_error_freeze(void) { vips_error_freeze(); }
 
 void vipsx_error_thaw(void) { vips_error_thaw(); }
 
-// Sources and targets over an already-open descriptor.
-//
-// libvips does not take the descriptor: it neither dups it nor closes it, so
-// whoever opened it keeps both duties. The Go side holds the *os.File to make
-// that true rather than merely documented.
-VipsSource *vipsx_source_new_from_descriptor(int fd) {
-  return vips_source_new_from_descriptor(fd);
-}
-
-VipsTarget *vipsx_target_new_to_descriptor(int fd) {
-  return vips_target_new_to_descriptor(fd);
-}
-
 // Peek at the front of a source without consuming it. The pointer is the
 // source's own buffer, so Go copies out of it.
 const void *vipsx_source_sniff(VipsSource *source, size_t length) {

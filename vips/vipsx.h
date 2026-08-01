@@ -65,6 +65,10 @@
 #define VIPSX_FLAG_INPUT 2
 #define VIPSX_FLAG_OUTPUT 4
 #define VIPSX_FLAG_DEPRECATED 8
+// The operation writes into this argument in place rather than producing an
+// output. The draw family is the whole population. Dropping this bit was a
+// bug: a caller cannot know an input will be scribbled on unless told.
+#define VIPSX_FLAG_MODIFY 16
 
 // One input argument. A single flat struct so an entire call crosses the cgo
 // boundary once, not once per argument.
@@ -230,11 +234,14 @@ VipsInterpolate *vipsx_interpolate_new(const char *nickname);
 // which is how libvips is told to take its sequential path.
 VipsSourceCustom *vipsx_source_custom_new(guint64 id, int seekable);
 VipsTargetCustom *vipsx_target_custom_new(guint64 id);
+VipsSource *vipsx_source_new_from_descriptor_pinned(int fd, guint64 id);
+VipsTarget *vipsx_target_new_to_descriptor_pinned(int fd, guint64 id);
 VipsSource *vipsx_source_new_from_file(const char *filename);
 VipsSource *vipsx_source_new_from_memory(const void *data, size_t len);
 VipsTarget *vipsx_target_new_to_file(const char *filename);
 VipsTarget *vipsx_target_new_to_memory(void);
 void *vipsx_target_steal(VipsTarget *target, size_t *len);
+void vipsx_object_ref(void *obj);
 void vipsx_object_unref(void *obj);
 
 // Release memory libvips allocated with g_malloc.
@@ -289,6 +296,7 @@ VipsImage *vipsx_image_new_from_memory(const void *data, size_t size, int width,
                                        int height, int bands, int format);
 void *vipsx_image_write_to_memory(VipsImage *image, size_t *size);
 VipsImage *vipsx_image_copy_memory(VipsImage *image);
+VipsImage *vipsx_image_mutable_copy(VipsImage *in);
 guint64 vipsx_format_sizeof(int format);
 const void *vipsx_image_get_data(VipsImage *image);
 
@@ -314,8 +322,6 @@ void vipsx_image_minimise_all(VipsImage *image);
 void vipsx_image_invalidate_all(VipsImage *image);
 void vipsx_error_freeze(void);
 void vipsx_error_thaw(void);
-VipsSource *vipsx_source_new_from_descriptor(int fd);
-VipsTarget *vipsx_target_new_to_descriptor(int fd);
 const void *vipsx_source_sniff(VipsSource *source, size_t length);
 gint64 vipsx_source_length(VipsSource *source);
 void vipsx_source_minimise(VipsSource *source);

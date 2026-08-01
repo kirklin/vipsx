@@ -60,7 +60,10 @@ var logHandler atomic.Pointer[logSink]
 //	    slog.Warn("libvips", "domain", domain, "level", level.String(), "msg", msg)
 //	})
 //
-// Passing nil restores GLib's default handler.
+// Passing nil restores GLib's default handler — GLib's, not whichever handler
+// another library may have installed before this one: GLib does not expose the
+// data pointer an earlier handler was registered with, so putting it back
+// faithfully is not possible from here.
 //
 // Two things to know before installing one. It is process-wide, because GLib's
 // handler is: a program using another GLib library will see that library's

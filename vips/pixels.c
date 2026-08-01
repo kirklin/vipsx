@@ -33,6 +33,23 @@ VipsImage *vipsx_image_copy_memory(VipsImage *image) {
   return vips_image_copy_memory(image);
 }
 
+// A private, memory-backed copy, for handing to an operation that modifies its
+// input in place.
+//
+// vips_image_copy_memory alone is not enough: on an image that is already a
+// memory buffer it refs and returns the same object, which is exactly the
+// sharing this exists to prevent. vips_copy always makes a new image — it is
+// marked nocache, so the copy really is fresh — and materialising that copy
+// yields pixels nothing else can see.
+VipsImage *vipsx_image_mutable_copy(VipsImage *in) {
+  VipsImage *t;
+  if (vips_copy(in, &t, NULL))
+    return NULL;
+  VipsImage *out = vips_image_copy_memory(t);
+  g_object_unref(t);
+  return out;
+}
+
 guint64 vipsx_format_sizeof(int format) {
   return vips_format_sizeof((VipsBandFormat)format);
 }
