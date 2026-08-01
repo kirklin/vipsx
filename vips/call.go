@@ -122,6 +122,14 @@ func Call(operation string, args ...Arg) (Outputs, error) {
 		outPtr = &couts[0]
 	}
 
+	// With isolation on, the call and the drain of the error buffer happen
+	// together, so a message cannot be another failure's. See SetErrorIsolation
+	// for why that is a mode and not the default.
+	if errorIsolation.Load() {
+		errorIsolMu.Lock()
+		defer errorIsolMu.Unlock()
+	}
+
 	rc := C.vipsx_call(cop, argPtr, C.int(len(cargs)), outPtr, C.int(len(couts)))
 	runtime.KeepAlive(keep)
 

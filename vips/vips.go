@@ -98,15 +98,46 @@ func SetConcurrency(n int) { C.vipsx_concurrency_set(C.int(n)) }
 // Concurrency reports the current worker thread count.
 func Concurrency() int { return int(C.vipsx_concurrency_get()) }
 
-// lastError drains the libvips thread-local error buffer.
+// lastError drains the libvips error buffer.
 func lastError() string {
 	cstr := C.vipsx_error_buffer_copy()
 	defer C.free(unsafe.Pointer(cstr))
 	return C.GoString(cstr)
 }
 
+var (
+	// errorIsolation serialises calls so a failure's message is its own. See
+	// SetErrorIsolation.
+	errorIsolation atomic.Bool
+	errorIsolMu    sync.Mutex
+)
+
+// SetErrorIsolation trades throughput for exact error attribution.
+//
+// libvips keeps one error buffer for the whole process, not one per thread or
+// per call. Two operations failing at the same time append to the same buffer,
+// so a message can arrive carrying another goroutine's text, or another
+// goroutine's alone. Draining it is atomic here, which is why nothing is ever
+// lost, but atomicity cannot say which failure a line came from.
+//
+// With isolation on, one operation runs at a time, so a failure's message can
+// only be its own. That serialises every call, successful ones included, and is
+// meant for reproducing a problem rather than for serving traffic. It is off by
+// default.
+//
+// The limitation is libvips', not this package's: pyvips and govips read the
+// same global buffer the same way.
+func SetErrorIsolation(on bool) { errorIsolation.Store(on) }
+
+// ErrorIsolation reports whether calls are being serialised for attribution.
+func ErrorIsolation() bool { return errorIsolation.Load() }
+
 // Error is returned when libvips rejects a call. Op names the operation that
 // failed so the message stays useful once calls are nested.
+//
+// Message comes from libvips' process-wide error buffer. Under concurrency it
+// can carry text from another failure that happened at the same moment; see
+// SetErrorIsolation.
 type Error struct {
 	Op      string
 	Message string
