@@ -56,7 +56,12 @@ void *vipsx_target_steal(VipsTarget *target, size_t *len) {
     return NULL;
   }
 
-  void *copy = g_malloc(blob_len);
+  void *copy = g_try_malloc(blob_len);
+  if (!copy) {
+    vips_area_unref(VIPS_AREA(blob));
+    *len = 0;
+    return NULL;
+  }
   memcpy(copy, data, blob_len);
   *len = blob_len;
   vips_area_unref(VIPS_AREA(blob));

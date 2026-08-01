@@ -58,7 +58,7 @@ char *vipsx_image_get_string(VipsImage *image, const char *name) {
   const char *s = NULL;
   if (vips_image_get_string(image, name, &s) != 0 || !s)
     return NULL;
-  return strdup(s);
+  return vipsx_dup(s);
 }
 
 char *vipsx_image_get_as_string(VipsImage *image, const char *name) {
@@ -72,8 +72,11 @@ void *vipsx_image_get_blob(VipsImage *image, const char *name, size_t *len) {
   const void *data = NULL;
   if (vips_image_get_blob(image, name, &data, len) != 0)
     return NULL;
-  void *copy = malloc(*len);
-  memcpy(copy, data, *len);
+  // A present-but-empty blob still has to come back as a pointer, or the Go
+  // side reads the NULL as "no such field".
+  void *copy = vipsx_alloc0(*len);
+  if (copy && data && *len)
+    memcpy(copy, data, *len);
   return copy;
 }
 
@@ -82,8 +85,11 @@ int vipsx_image_get_array_double(VipsImage *image, const char *name,
   double *a = NULL;
   if (vips_image_get_array_double(image, name, &a, n) != 0)
     return -1;
-  *out = malloc(*n * sizeof(double));
-  memcpy(*out, a, *n * sizeof(double));
+  *out = vipsx_alloc0((size_t)*n * sizeof(double));
+  if (!*out)
+    return -1;
+  if (a && *n > 0)
+    memcpy(*out, a, (size_t)*n * sizeof(double));
   return 0;
 }
 
@@ -92,8 +98,11 @@ int vipsx_image_get_array_int(VipsImage *image, const char *name, int **out,
   int *a = NULL;
   if (vips_image_get_array_int(image, name, &a, n) != 0)
     return -1;
-  *out = malloc(*n * sizeof(int));
-  memcpy(*out, a, *n * sizeof(int));
+  *out = vipsx_alloc0((size_t)*n * sizeof(int));
+  if (!*out)
+    return -1;
+  if (a && *n > 0)
+    memcpy(*out, a, (size_t)*n * sizeof(int));
   return 0;
 }
 
@@ -112,8 +121,9 @@ void vipsx_image_set_string(VipsImage *image, const char *name,
 
 void vipsx_image_set_blob(VipsImage *image, const char *name, const void *data,
                           size_t len) {
-  void *copy = g_malloc(len);
-  memcpy(copy, data, len);
+  void *copy = g_malloc(len ? len : 1);
+  if (data && len)
+    memcpy(copy, data, len);
   vips_image_set_blob(image, name, (VipsCallbackFn)g_free, copy, len);
 }
 

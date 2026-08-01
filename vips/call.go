@@ -316,8 +316,44 @@ func unmarshal(out *C.VipsxOut) (any, error) {
 		return float64(out.d), nil
 	case KindString, KindRefString:
 		return C.GoString(out.s), nil
-	case KindImage, KindSource, KindTarget, KindInterpolate, KindObject:
+	case KindImage:
 		return wrapImage(out.p), nil
+
+	// Each of these used to be wrapped as an *Image, which is a lie about the
+	// type rather than a leak: the reference counting works out, and then a
+	// caller reads Width off what is really a VipsTarget. No operation in
+	// libvips 8.18 has such an output, so nothing has ever hit it — which is
+	// the argument for handling it now rather than after one appears.
+	case KindSource:
+		if out.p == nil {
+			return (*Source)(nil), nil
+		}
+		s := &Source{}
+		s.init(out.p)
+		return s, nil
+	case KindTarget:
+		if out.p == nil {
+			return (*Target)(nil), nil
+		}
+		t := &Target{}
+		t.init(out.p)
+		return t, nil
+	case KindInterpolate:
+		if out.p == nil {
+			return (*Interpolate)(nil), nil
+		}
+		i := &Interpolate{}
+		i.init(out.p)
+		return i, nil
+	case KindObject:
+		// A bare GObject has no handle type here, and guessing one would be the
+		// mistake above. Release the reference C took for us and say so.
+		if out.p != nil {
+			C.vipsx_object_unref(out.p)
+		}
+		return nil, fmt.Errorf("output %q is a plain GObject, which this package has no type for",
+			C.GoString(out.name))
+
 	case KindBlob:
 		return goBytes(out.arr, out.n), nil
 	case KindArrayInt:

@@ -24,12 +24,12 @@ int vipsx_version(int which) { return vips_version(which); }
 char *vipsx_error_buffer_copy(void) {
 #if VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 10)
   char *msg = vips_error_buffer_copy();
-  char *copy = strdup(msg ? msg : "");
+  char *copy = vipsx_dup(msg);
   g_free(msg);
   return copy;
 #else
   const char *buf = vips_error_buffer();
-  char *copy = strdup(buf ? buf : "");
+  char *copy = vipsx_dup(buf);
   vips_error_clear();
   return copy;
 #endif

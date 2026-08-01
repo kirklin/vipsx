@@ -122,6 +122,12 @@ typedef struct _VipsxEnumValue {
   int value;
 } VipsxEnumValue;
 
+// Allocation that can be checked. Both stay in the malloc family, because what
+// they return is released with free() on both sides of the cgo boundary.
+// vipsx_alloc0 zeroes, and never returns NULL for a zero-length request.
+void *vipsx_alloc0(size_t n);
+char *vipsx_dup(const char *s);
+
 int vipsx_init(const char *name);
 void vipsx_shutdown(void);
 const char *vipsx_version_string(void);
