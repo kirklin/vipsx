@@ -519,37 +519,6 @@ For comparison: govips states 8.14+ but its CI exercises a single runner image,
 and vipsgen ships pre-generated packages for 8.16, 8.17 and 8.18, so the import
 path has to change with the installed version.
 
-## Status
-
-Not ready for production, and the reason is mileage rather than surface. This
-has no production hours behind it, against govips' years of service and
-vipsgen's use inside imagor. No amount of code closes that gap; only running it
-does.
-
-What is done: the generic call path, the generated typed layer, metadata,
-`io.Reader`/`io.Writer` streaming with content sniffing, raw pixels in and out,
-deadlines and cancellation, the hardening switches, the differential oracle and
-the leak suite.
-
-The CI matrix does run, and is green: libvips 8.14 in a Debian 12 container,
-8.15 on ubuntu-24.04, 8.18 on macOS, plus regenerating the typed layer against
-the CI libvips, ASan, and the C leak check. "One binding, any version" is
-tested rather than asserted.
-
-What is left before anyone should ship it:
-
-- **A stability promise.** This is v0, so the API can still move. v1, and a
-  statement about what v1 means, is worth more to a prospective user than
-  another function.
-- **Hours.** Somebody's real traffic, for long enough that the numbers mean
-  something, with `vips.Memory()` watched across it. This is the whole of the
-  gap against govips and vipsgen, and no amount of code closes it.
-
-Two limitations are properties of libvips rather than gaps here, and are
-documented above rather than listed as work: error messages cannot be attributed
-under concurrency without serialising calls, and cancellation is noticed at the
-next progress report rather than instantly.
-
 ## License
 
 MIT

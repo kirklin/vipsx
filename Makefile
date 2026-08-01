@@ -53,11 +53,15 @@ bigdata:
 CLEAK_CC ?= clang
 CLEAK_CFLAGS = -g -O1 -fsanitize=address -fno-omit-frame-pointer -Ivips
 
-# Everything except stream.c, which calls into Go through the header cgo
-# generates and therefore cannot be compiled without it. Nothing it contains is
-# reachable from a program with no Go in it anyway: the custom source and target
-# exist to hand bytes to an io.Reader.
-CLEAK_SOURCES = $(filter-out vips/stream.c,$(wildcard vips/*.c))
+# Everything that does not call back into Go.
+#
+# A file including _cgo_export.h cannot be compiled without cgo having run, and
+# nothing in one is reachable from a program with no Go in it anyway: those
+# handlers exist to hand bytes to an io.Reader or a report to a callback. The
+# list is derived rather than written down, because writing it down is how it
+# went stale — stream.c was named here, and adding logging.c and progress.c
+# broke the build on CI rather than at the desk of whoever added them.
+CLEAK_SOURCES = $(shell grep -L "_cgo_export.h" vips/*.c)
 cleak:
 	@which $(CLEAK_CC) >/dev/null || \
 		(echo "$(CLEAK_CC) is needed for -fsanitize=address" && exit 1)
