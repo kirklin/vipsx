@@ -258,4 +258,12 @@ int vipsx_block_untrusted_set(int state);
 int vipsx_operation_block_set(const char *name, int state);
 int vipsx_pipe_read_limit_set(gint64 limit);
 
+// Watching an evaluation. Enabling progress and connecting the handler happen
+// together: a handler on an image that was never told to report is a silent
+// no-op, and a timeout built on one would simply never fire.
+gulong vipsx_watch_eval(VipsImage *image, guint64 id, gulong *posteval_id);
+void vipsx_unwatch_eval(VipsImage *image, gulong eval_id, gulong posteval_id);
+void vipsx_image_set_kill(VipsImage *image, int kill);
+int vipsx_image_iskilled(VipsImage *image);
+
 #endif
