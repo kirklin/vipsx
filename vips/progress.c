@@ -56,13 +56,6 @@ void vipsx_image_set_kill(VipsImage *image, int kill) {
   vips_image_set_kill(image, kill);
 }
 
-// vips_image_iskilled is a destructive read: it clears the flag it reports.
-// That is right for the pipeline, which acts on what it read, and wrong for a
-// caller who only asked — Killed() disarming a pending Kill would make the
-// getter change what it measures. Set the flag back when it was up.
 int vipsx_image_iskilled(VipsImage *image) {
-  int killed = vips_image_iskilled(image) ? 1 : 0;
-  if (killed)
-    vips_image_set_kill(image, TRUE);
-  return killed;
+  return vips_image_iskilled(image) ? 1 : 0;
 }

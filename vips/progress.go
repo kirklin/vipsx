@@ -210,9 +210,13 @@ func (im *Image) Kill() {
 
 // Killed reports whether evaluation of this image has been stopped.
 //
-// Asking does not disarm: libvips' own read of the flag consumes it, so this
-// wrapper puts it back — a getter that changed what it measures would make
-// Kill-then-Killed report false with the kill still wanted.
+// Reading the flag clears it, which is libvips' own behaviour rather than
+// this package's: vips_image_iskilled is what the pipeline calls to decide
+// whether to stop, and it consumes what it reports. So this answers true at
+// most once per Kill, and asking is not free — a Killed() call can take the
+// stop that an evaluation would otherwise have seen. It is reported as
+// libvips defines it rather than papered over, but it is a poor thing to
+// poll: to find out why an evaluation stopped, use Watch.Err.
 func (im *Image) Killed() bool {
 	p := im.acquire("Killed")
 	defer im.release(p)
