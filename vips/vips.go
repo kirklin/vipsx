@@ -39,7 +39,14 @@ func init() { Startup() }
 
 // Startup initialises libvips. It is called automatically on package load and
 // is safe to call again; only the first call has an effect.
+//
+// After Shutdown it reports an error instead of pretending: libvips cannot be
+// initialised twice in one process, and returning nil here would send the next
+// Call into a library that has been torn down.
 func Startup() error {
+	if shutdownDone.Load() {
+		return errShutdown
+	}
 	initOnce.Do(func() {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -54,12 +61,18 @@ func Startup() error {
 	return initErr
 }
 
+var errShutdown = fmt.Errorf(
+	"vips: Shutdown has been called, and libvips cannot be restarted in this process")
+
 // Shutdown releases libvips resources. Calling any other function afterwards is
 // undefined; this exists for leak checking under valgrind and ASan.
 //
 // Handles still alive at this point are not the caller's problem: the collector
 // may run their cleanups long after this returns, and those check the same flag
-// set here rather than unreffing into freed memory.
+// set here rather than unreffing into freed memory. A cleanup that has already
+// passed its check when the flag flips is the one window left open; it is a
+// few instructions wide, and closing it would mean draining the collector,
+// which a leak-checking exit does not need.
 func Shutdown() {
 	shutdownDone.Store(true)
 	C.vipsx_shutdown()

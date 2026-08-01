@@ -9,7 +9,6 @@ import "C"
 import (
 	"fmt"
 	"reflect"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -44,6 +43,20 @@ type Outputs map[string]any
 // The operation does not need to be known to this package: the signature is
 // read from the installed libvips at runtime, so an operation added in a newer
 // libvips works without changes here.
+//
+// An argument the operation modifies in place — the image of a draw operation
+// — is never the caller's. libvips writes into that argument rather than
+// producing an output, and the object a caller holds may be shared: identical
+// calls served from the operation cache return the same image, so drawing on
+// it directly would draw on every holder's copy at once. Call substitutes a
+// private memory copy, lets libvips modify that, and returns it in Outputs
+// under the argument's name:
+//
+//	outs, err := vips.Call("draw_rect",
+//	    vips.In("image", im), vips.In("ink", []float64{255}),
+//	    vips.In("left", 10), vips.In("top", 10),
+//	    vips.In("width", 100), vips.In("height", 100))
+//	drawn, err := outs.Image("image")   // the result; im itself is untouched
 func Call(operation string, args ...Arg) (Outputs, error) {
 	if err := Startup(); err != nil {
 		return nil, err
@@ -58,9 +71,28 @@ func Call(operation string, args ...Arg) (Outputs, error) {
 		ar       arena
 		cargs    []C.VipsxArg
 		outNames []string
-		keep     []any
+		// acquired holds the extra reference marshalling takes on every handle
+		// argument. The references, not runtime.KeepAlive, are what make a
+		// concurrent Close on an argument safe: Close revokes the handle but
+		// cannot free an object this call still holds.
+		acquired []unsafe.Pointer
+		// mutated holds the private copies made for modify arguments. They are
+		// handed to the caller through Outputs on success; on any failure they
+		// are closed here rather than left to the collector.
+		mutated   map[string]*Image
+		handedOff bool
 	)
 	defer ar.free()
+	defer func() {
+		for _, p := range acquired {
+			C.vipsx_object_unref(p)
+		}
+		if !handedOff {
+			for _, im := range mutated {
+				im.Close()
+			}
+		}
+	}()
 
 	for _, a := range args {
 		as, ok := spec.Arg(a.name)
@@ -89,10 +121,34 @@ func Call(operation string, args ...Arg) (Outputs, error) {
 			}
 		}
 
+		value := a.value
+		if as.Modify {
+			// The operation writes into this argument. The caller's object may
+			// be shared through the operation cache, so what libvips gets is a
+			// private copy, returned to the caller through Outputs.
+			if as.Kind != KindImage {
+				return nil, &Error{
+					Op: operation,
+					Message: fmt.Sprintf(
+						"argument %q is modified in place and its kind %s is not supported",
+						a.name, as.Kind),
+				}
+			}
+			private, err := mutableCopy(a.value, as)
+			if err != nil {
+				return nil, &Error{Op: operation, Message: err.Error()}
+			}
+			if mutated == nil {
+				mutated = map[string]*Image{}
+			}
+			mutated[a.name] = private
+			value = private
+		}
+
 		var ca C.VipsxArg
 		ca.name = ar.cstring(a.name)
 		ca.kind = C.int(as.Kind)
-		if err := marshal(&ar, as, a.value, &ca, &keep); err != nil {
+		if err := marshal(&ar, as, value, &ca, &acquired); err != nil {
 			return nil, &Error{Op: operation, Message: err.Error()}
 		}
 		cargs = append(cargs, ca)
@@ -131,7 +187,6 @@ func Call(operation string, args ...Arg) (Outputs, error) {
 	}
 
 	rc := C.vipsx_call(cop, argPtr, C.int(len(cargs)), outPtr, C.int(len(couts)))
-	runtime.KeepAlive(keep)
 
 	if rc != 0 {
 		return nil, &Error{Op: operation, Message: lastError()}
@@ -144,15 +199,58 @@ func Call(operation string, args ...Arg) (Outputs, error) {
 		if err != nil {
 			// Release anything already handed to us before bailing out.
 			for _, prior := range res {
-				if im, ok := prior.(*Image); ok {
-					im.Close()
+				closeOutput(prior)
+			}
+			// And the references C took for outputs not yet unmarshalled:
+			// nothing will ever wrap them, and vipsx_out_clear leaves .p alone.
+			for j := i + 1; j < len(couts); j++ {
+				if couts[j].p != nil {
+					C.vipsx_object_unref(couts[j].p)
+					couts[j].p = nil
 				}
 			}
 			return nil, &Error{Op: operation, Message: err.Error()}
 		}
+		// An optional output the operation never produced comes back nil.
+		// Leaving it out of the map lets the accessor say "no output" rather
+		// than handing over a typed nil that panics on first use.
+		if v == nil {
+			continue
+		}
 		res[name] = v
 	}
+	// The private copies made for modify arguments are outputs in every sense
+	// that matters: they carry what the operation produced. Hand them over
+	// under their argument names.
+	for name, im := range mutated {
+		res[name] = im
+	}
+	handedOff = true
 	return res, nil
+}
+
+// mutableCopy makes the private, memory-backed copy Call substitutes for an
+// argument the operation would otherwise modify in place.
+func mutableCopy(v any, spec ArgSpec) (*Image, error) {
+	im, ok := v.(*Image)
+	if !ok {
+		return nil, typeErr(spec, v, "image handle")
+	}
+	if isNilPointer(v) {
+		return nil, fmt.Errorf("argument %q: handle is nil", spec.Name)
+	}
+	p := im.tryAcquire()
+	if p == nil {
+		return nil, fmt.Errorf("argument %q: handle is closed", spec.Name)
+	}
+	defer im.release(p)
+
+	cp := C.vipsx_image_mutable_copy(p)
+	if cp == nil {
+		return nil, fmt.Errorf("argument %q: copying for in-place modification: %s",
+			spec.Name, lastError())
+	}
+	return wrapImage(unsafe.Pointer(cp)), nil
 }
 
 func (s *OpSpec) argList() string {
@@ -194,7 +292,7 @@ func dedupe(in []string) []string {
 // is rejected here rather than being passed along as something plausible.
 // ---------------------------------------------------------------------------
 
-func marshal(ar *arena, spec ArgSpec, v any, dst *C.VipsxArg, keep *[]any) error {
+func marshal(ar *arena, spec ArgSpec, v any, dst *C.VipsxArg, acquired *[]unsafe.Pointer) error {
 	switch spec.Kind {
 	case KindBool:
 		b, ok := asBool(v)
@@ -205,10 +303,25 @@ func marshal(ar *arena, spec ArgSpec, v any, dst *C.VipsxArg, keep *[]any) error
 			dst.i = 1
 		}
 
-	case KindInt, KindUint64, KindFlags:
+	case KindInt, KindUint64:
 		n, ok := asInt(v)
 		if !ok {
 			return typeErr(spec, v, "integer")
+		}
+		dst.i = C.gint64(n)
+
+	case KindFlags:
+		n, ok := asInt(v)
+		if !ok {
+			return typeErr(spec, v, "integer")
+		}
+		// Bits outside the type are checked here because GLib does not reject
+		// them: property validation masks unknown bits off silently, so a
+		// typo'd flag would simply not happen — the wrong metadata kept, the
+		// wrong page skipped — with nothing saying so.
+		if !isFlagsValue(spec.TypeName, n) {
+			return fmt.Errorf("argument %q: %#x has bits outside %s, whose members are %s",
+				spec.Name, n, spec.TypeName, enumMembers(spec.TypeName))
 		}
 		dst.i = C.gint64(n)
 
@@ -253,12 +366,12 @@ func marshal(ar *arena, spec ArgSpec, v any, dst *C.VipsxArg, keep *[]any) error
 		if obj == nil || isNilPointer(v) {
 			return fmt.Errorf("argument %q: handle is nil", spec.Name)
 		}
-		p := obj.cPointer()
+		p := obj.acquireObject()
 		if p == nil {
 			return fmt.Errorf("argument %q: handle is closed", spec.Name)
 		}
+		*acquired = append(*acquired, p)
 		dst.p = p
-		*keep = append(*keep, v)
 
 	case KindArrayInt:
 		xs, ok := asIntSlice(v)
@@ -281,13 +394,16 @@ func marshal(ar *arena, spec ArgSpec, v any, dst *C.VipsxArg, keep *[]any) error
 		}
 		ptrs := make([]unsafe.Pointer, len(ims))
 		for i, im := range ims {
-			if im == nil || im.cPointer() == nil {
+			p := im.acquireObject()
+			if p == nil {
 				return fmt.Errorf("argument %q: image %d is nil or closed", spec.Name, i)
 			}
-			ptrs[i] = im.cPointer()
+			// Appended one at a time so the ones already taken are released
+			// even when a later element turns out closed.
+			*acquired = append(*acquired, p)
+			ptrs[i] = p
 		}
 		dst.arr, dst.n = ar.pointers(ptrs)
-		*keep = append(*keep, v)
 
 	case KindBlob:
 		b, ok := asBytes(v)
@@ -317,6 +433,12 @@ func unmarshal(out *C.VipsxOut) (any, error) {
 	case KindString, KindRefString:
 		return C.GoString(out.s), nil
 	case KindImage:
+		// nil for an optional output the operation never produced; Call skips
+		// storing it, so the accessor reports "no output" instead of handing
+		// over a handle that panics on first use.
+		if out.p == nil {
+			return nil, nil
+		}
 		return wrapImage(out.p), nil
 
 	// Each of these used to be wrapped as an *Image, which is a lie about the
@@ -326,21 +448,21 @@ func unmarshal(out *C.VipsxOut) (any, error) {
 	// the argument for handling it now rather than after one appears.
 	case KindSource:
 		if out.p == nil {
-			return (*Source)(nil), nil
+			return nil, nil
 		}
 		s := &Source{}
 		s.init(out.p)
 		return s, nil
 	case KindTarget:
 		if out.p == nil {
-			return (*Target)(nil), nil
+			return nil, nil
 		}
 		t := &Target{}
 		t.init(out.p)
 		return t, nil
 	case KindInterpolate:
 		if out.p == nil {
-			return (*Interpolate)(nil), nil
+			return nil, nil
 		}
 		i := &Interpolate{}
 		i.init(out.p)
@@ -418,6 +540,21 @@ func isEnumMember(typeName string, value int) bool {
 	}
 	_, ok := members[value]
 	return ok
+}
+
+// isFlagsValue reports whether every set bit belongs to the flags type. Unlike
+// an enum, a flags value is a combination, so membership is a mask test rather
+// than a lookup.
+func isFlagsValue(typeName string, value int64) bool {
+	members := enumValuesFor(typeName)
+	if len(members) == 0 {
+		return true // nothing known about this type; let libvips decide
+	}
+	var mask int64
+	for v := range members {
+		mask |= int64(v)
+	}
+	return value&^mask == 0
 }
 
 func enumMembers(typeName string) string {

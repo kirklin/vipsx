@@ -68,6 +68,8 @@ void *vipsx_target_steal(VipsTarget *target, size_t *len) {
   return copy;
 }
 
+void vipsx_object_ref(void *obj) { g_object_ref(obj); }
+
 void vipsx_object_unref(void *obj) { g_object_unref(obj); }
 
 void vipsx_gfree(void *p) { g_free(p); }

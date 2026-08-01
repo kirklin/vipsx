@@ -8,7 +8,6 @@ import "C"
 
 import (
 	"context"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -81,10 +80,13 @@ func (w *Watch) Stop() {
 	w.im.watch.CompareAndSwap(w, nil)
 
 	// A closed image has already been unreffed, and its handlers went with it.
-	if p := w.im.ptr.Load(); p != nil {
+	// The reference taken here is what makes racing a Close safe: either the
+	// acquire loses and there is nothing to disconnect, or it wins and the
+	// object stays alive through the disconnect.
+	if p := w.im.tryAcquire(); p != nil {
 		C.vipsx_unwatch_eval(p, w.evalID, w.postID)
+		w.im.release(p)
 	}
-	runtime.KeepAlive(w.im)
 }
 
 var (
@@ -114,12 +116,15 @@ func unregisterWatch(id uint64) {
 //
 // The callback runs on a libvips worker thread, possibly several, so it has to
 // be safe to call concurrently and should be cheap — it sits in the middle of
-// the pipeline.
+// the pipeline. It must not call back into this package: with SetErrorIsolation
+// on, a Call made from inside the callback waits for the very lock the
+// evaluation's own Call is holding while it waits for the callback.
 //
 // One watch at a time per image; attaching a second is an error rather than a
 // silent replacement.
 func (im *Image) OnProgress(fn func(Progress) error) (*Watch, error) {
-	p := im.live("OnProgress")
+	p := im.acquire("OnProgress")
+	defer im.release(p)
 	if fn == nil {
 		return nil, &Error{Op: "progress", Message: "nil callback"}
 	}
@@ -139,7 +144,6 @@ func (im *Image) OnProgress(fn func(Progress) error) (*Watch, error) {
 	watchMu.Unlock()
 
 	w.evalID = C.vipsx_watch_eval(p, C.guint64(w.id), &w.postID)
-	runtime.KeepAlive(im)
 	return w, nil
 }
 
@@ -165,7 +169,9 @@ func (im *Image) OnProgress(fn func(Progress) error) (*Watch, error) {
 // than immediate, and an operation that computes nothing along the way cannot
 // be interrupted at all. In practice libvips reports often enough that a
 // deadline lands within a fraction of a second; a single decode of one huge
-// frame is the case where it does not.
+// frame is the case where it does not. A result served from the operation
+// cache is the other gap: nothing is evaluated, so there is nothing to cancel
+// — and nothing that needs it, since a cached result returns immediately.
 func (im *Image) CancelOn(ctx context.Context) (*Watch, error) {
 	if ctx == nil {
 		return nil, &Error{Op: "progress", Message: "nil context"}
@@ -186,18 +192,30 @@ func (im *Image) CancelOn(ctx context.Context) (*Watch, error) {
 // Kill stops evaluation of this image and everything downstream of it.
 //
 // The operation waiting on those pixels fails. Unlike Close this does not
-// release anything: the handle stays usable, and libvips clears the flag when
-// the next evaluation starts.
+// release anything: the handle stays usable. The flag is consumed by the
+// pipeline that acts on it, and libvips also resets it when a new evaluation
+// starts — so a Kill before any evaluation is running does not carry forward,
+// which is why CancelOn works through the progress callback rather than
+// relying on this.
+//
+// The flag lives on the underlying image, which identical cached calls share:
+// killing an image another holder also reached through the cache can fail
+// that holder's next use of it. Kill what is privately yours — an image mid-
+// evaluation in your own pipeline — rather than something just loaded.
 func (im *Image) Kill() {
-	p := im.live("Kill")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Kill")
+	defer im.release(p)
 	C.vipsx_image_set_kill(p, 1)
 }
 
 // Killed reports whether evaluation of this image has been stopped.
+//
+// Asking does not disarm: libvips' own read of the flag consumes it, so this
+// wrapper puts it back — a getter that changed what it measures would make
+// Kill-then-Killed report false with the kill still wanted.
 func (im *Image) Killed() bool {
-	p := im.live("Killed")
-	defer runtime.KeepAlive(im)
+	p := im.acquire("Killed")
+	defer im.release(p)
 	return C.vipsx_image_iskilled(p) != 0
 }
 

@@ -9,6 +9,7 @@ import "C"
 import (
 	"errors"
 	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -47,6 +48,23 @@ type stream struct {
 	id     uint64
 	closed atomic.Bool
 
+	// file pins the *os.File behind a descriptor-backed source or target. It
+	// is set once at construction and never cleared by Close: libvips neither
+	// dups nor closes the descriptor, and a lazy image can keep the C object —
+	// and with it the need for the descriptor — alive long after every Go
+	// reference to the wrapper is gone. The registry entry holds this until
+	// the C object dies, which is what stops the collector finalizing the
+	// os.File and closing a descriptor a pipeline still reads.
+	file *os.File
+
+	// ioMu is held for reading across every callback's whole I/O call, and for
+	// writing by release. That is what makes Close's promise true: when Close
+	// returns, no libvips worker is still inside the caller's Read or Write,
+	// so the caller really does have the reader or writer back. Without it,
+	// Close could nil the fields and return while a Read was still running,
+	// and a caller who then reused or closed the reader would race it.
+	ioMu sync.RWMutex
+
 	// mu guards the reader, writer and error together: Close drops the first
 	// two while a libvips worker thread may be using them, and Err reads the
 	// third from a third goroutine.
@@ -73,8 +91,8 @@ func (s *stream) firstErr() error {
 }
 
 // release drops the reader or writer at Close, which is the whole point of
-// closing: the caller gets it back immediately rather than when libvips
-// eventually lets go of the C object.
+// closing: the caller gets it back as soon as any in-flight callback returns,
+// rather than when libvips eventually lets go of the C object.
 //
 // The registry entry itself stays until the C object dies, and that is what
 // makes ErrStreamClosed possible. Deleting the entry here instead left a later
@@ -83,6 +101,11 @@ func (s *stream) firstErr() error {
 // to say. The entry is a few words; the reader was the thing worth freeing.
 func (s *stream) release() {
 	s.closed.Store(true)
+	// Wait out any callback currently inside the caller's Read or Write; a
+	// new one sees closed and stops at use(). Only then is handing the reader
+	// or writer back to the caller actually true.
+	s.ioMu.Lock()
+	defer s.ioMu.Unlock()
 	s.mu.Lock()
 	s.reader, s.seeker, s.writer = nil, nil, nil
 	s.mu.Unlock()
@@ -121,6 +144,11 @@ func OpenStreams() int {
 	defer streamsMu.RUnlock()
 	n := 0
 	for _, s := range streams {
+		// Descriptor pins are in the registry for lifetime only; they hold no
+		// reader or writer of the caller's and are not what this counts.
+		if s.file != nil {
+			continue
+		}
 		if !s.closed.Load() {
 			n++
 		}
@@ -146,6 +174,8 @@ func vipsxGoRead(id C.guint64, buffer unsafe.Pointer, length C.gint64) C.gint64 
 	if s == nil || length <= 0 {
 		return -1
 	}
+	s.ioMu.RLock()
+	defer s.ioMu.RUnlock()
 	reader, _, _, ok := s.use()
 	if !ok || reader == nil {
 		return -1
@@ -178,6 +208,8 @@ func vipsxGoSeek(id C.guint64, offset C.gint64, whence C.int) C.gint64 {
 	if s == nil {
 		return -1
 	}
+	s.ioMu.RLock()
+	defer s.ioMu.RUnlock()
 	_, seeker, _, ok := s.use()
 	if !ok || seeker == nil {
 		return -1
@@ -196,6 +228,8 @@ func vipsxGoWrite(id C.guint64, data unsafe.Pointer, length C.gint64) C.gint64 {
 	if s == nil {
 		return -1
 	}
+	s.ioMu.RLock()
+	defer s.ioMu.RUnlock()
 	_, _, writer, ok := s.use()
 	if !ok || writer == nil {
 		return -1
@@ -214,8 +248,14 @@ func vipsxGoEnd(id C.guint64) C.int {
 	if s == nil {
 		return -1
 	}
+	s.ioMu.RLock()
+	defer s.ioMu.RUnlock()
 	_, _, writer, live := s.use()
-	if !live {
+	// A nil writer here means a Close slipped in after the closed check: the
+	// Flush below would be skipped on a writer that still had bytes buffered,
+	// and returning 0 would report the save as complete when its tail was
+	// never written. Truncation must fail, not succeed quietly.
+	if !live || writer == nil {
 		return -1
 	}
 	if f, ok := writer.(interface{ Flush() error }); ok {
@@ -246,8 +286,9 @@ func vipsxGoStreamGone(id C.guint64) {
 // needs. Both work; the seekable one works for more formats, since a few
 // loaders cannot operate without seeking.
 //
-// Close releases r immediately, so it must come after every image loaded from
-// the source has been evaluated or closed — save first, then close. This is
+// Close releases r as soon as no callback is still inside it, so it must come
+// after every image loaded from the source has been evaluated or closed —
+// save first, then close. This is
 // one place a reader-backed source is stricter than a file-backed one: a file
 // stays readable through libvips' own reference after the handle closes, while
 // a demand for bytes after this Close fails the operation. It fails cleanly,

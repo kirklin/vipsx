@@ -88,6 +88,8 @@ static void *vipsx_collect_arg(VipsObject *object, GParamSpec *pspec,
     flags |= VIPSX_FLAG_OUTPUT;
   if (argument_class->flags & VIPS_ARGUMENT_DEPRECATED)
     flags |= VIPSX_FLAG_DEPRECATED;
+  if (argument_class->flags & VIPS_ARGUMENT_MODIFY)
+    flags |= VIPSX_FLAG_MODIFY;
   spec->flags = flags;
 
   data->count++;

@@ -7,7 +7,6 @@ package vips
 import "C"
 
 import (
-	"runtime"
 	"unsafe"
 )
 
@@ -91,8 +90,8 @@ func LoaderForSource(src *Source) (string, error) {
 	if err := Startup(); err != nil {
 		return "", err
 	}
-	p := src.live("LoaderForSource")
-	defer runtime.KeepAlive(src)
+	p := src.acquire("LoaderForSource")
+	defer src.release(p)
 
 	name := C.vipsx_find_load_source((*C.VipsSource)(p))
 	if name == nil {
@@ -121,6 +120,12 @@ func SaverForTarget(suffix string) (string, error) {
 // arguments are passed to that loader, so loader-specific options work here:
 //
 //	im, err := vips.LoadFile("photo.jpg", vips.In("shrink", 2))
+//
+// Identical loads share: libvips caches built operations, so two calls with
+// the same path and arguments can return handles on the same underlying
+// image. Reading from it is what the cache is for; writing metadata on it
+// writes on every holder at once. Copy first — the generated Copy, or
+// Call("copy") — before Set* or RemoveField on a loaded image.
 func LoadFile(path string, args ...Arg) (*Image, error) {
 	loader, err := LoaderFor(path)
 	if err != nil {

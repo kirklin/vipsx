@@ -75,7 +75,13 @@ void *vipsx_image_get_blob(VipsImage *image, const char *name, size_t *len) {
   // A present-but-empty blob still has to come back as a pointer, or the Go
   // side reads the NULL as "no such field".
   void *copy = vipsx_alloc0(*len);
-  if (copy && data && *len)
+  if (!copy) {
+    // Without a message the NULL reads as "no such field", which is the
+    // wrong diagnosis for an allocator failure.
+    vips_error("vipsx", "out of memory copying field '%s'", name);
+    return NULL;
+  }
+  if (data && *len)
     memcpy(copy, data, *len);
   return copy;
 }
@@ -86,8 +92,10 @@ int vipsx_image_get_array_double(VipsImage *image, const char *name,
   if (vips_image_get_array_double(image, name, &a, n) != 0)
     return -1;
   *out = vipsx_alloc0((size_t)*n * sizeof(double));
-  if (!*out)
+  if (!*out) {
+    vips_error("vipsx", "out of memory copying field '%s'", name);
     return -1;
+  }
   if (a && *n > 0)
     memcpy(*out, a, (size_t)*n * sizeof(double));
   return 0;
@@ -99,8 +107,10 @@ int vipsx_image_get_array_int(VipsImage *image, const char *name, int **out,
   if (vips_image_get_array_int(image, name, &a, n) != 0)
     return -1;
   *out = vipsx_alloc0((size_t)*n * sizeof(int));
-  if (!*out)
+  if (!*out) {
+    vips_error("vipsx", "out of memory copying field '%s'", name);
     return -1;
+  }
   if (a && *n > 0)
     memcpy(*out, a, (size_t)*n * sizeof(int));
   return 0;
