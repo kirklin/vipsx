@@ -242,6 +242,9 @@ void vipsx_cache_set_max_mem(size_t bytes);
 int vipsx_cache_get_max(void);
 int vipsx_cache_get_size(void);
 void vipsx_cache_drop_all(void);
+void vipsx_cache_set_max_files(int max);
+int vipsx_cache_get_max_files(void);
+size_t vipsx_cache_get_max_mem(void);
 
 // Live allocation counters, for leak checking under load.
 size_t vipsx_tracked_mem(void);
@@ -250,6 +253,13 @@ int vipsx_tracked_allocs(void);
 int vipsx_tracked_files(void);
 
 char *vipsx_error_buffer_copy(void);
+
+// Per-thread cleanup, and libvips' own leak report at exit.
+void vipsx_thread_shutdown(void);
+void vipsx_leak_set(int leak);
+
+// Routing GLib and libvips diagnostics to the caller's logger.
+void vipsx_log_capture(int on);
 
 // Hardening, for a process that decodes images it did not choose.
 //

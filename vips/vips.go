@@ -98,6 +98,40 @@ func SetConcurrency(n int) { C.vipsx_concurrency_set(C.int(n)) }
 // Concurrency reports the current worker thread count.
 func Concurrency() int { return int(C.vipsx_concurrency_get()) }
 
+// ShutdownThread releases the thread-local state libvips hangs off every thread
+// that calls into it.
+//
+// Most Go programs never need this. The runtime creates OS threads and keeps
+// them, so the state is reused rather than leaked. It matters in one shape: a
+// goroutine that calls runtime.LockOSThread, uses this package, and then
+// returns. That thread is destroyed when the goroutine ends, and its libvips
+// state goes with it only if this was called first.
+//
+//	runtime.LockOSThread()
+//	defer func() {
+//	    vips.ShutdownThread()
+//	    runtime.UnlockOSThread()
+//	}()
+//
+// Calling it from a goroutine that is not locked to a thread is not useful and
+// not harmful: it releases the state of whichever thread happens to be running
+// it, which libvips will simply allocate again.
+func ShutdownThread() { C.vipsx_thread_shutdown() }
+
+// SetLeakReporting turns on libvips' own leak check, which prints what is still
+// allocated when the process exits.
+//
+// This is a different instrument from Memory, which samples counters while the
+// program runs. Use this when something is leaking and the counters have
+// already said so; use Memory to find out whether anything is.
+func SetLeakReporting(on bool) {
+	v := C.int(0)
+	if on {
+		v = 1
+	}
+	C.vipsx_leak_set(v)
+}
+
 // lastError drains the libvips error buffer.
 func lastError() string {
 	cstr := C.vipsx_error_buffer_copy()

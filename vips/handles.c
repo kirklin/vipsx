@@ -78,6 +78,16 @@ int vipsx_cache_get_max(void) { return vips_cache_get_max(); }
 
 int vipsx_cache_get_size(void) { return vips_cache_get_size(); }
 
+// The cache has three limits, not two: operations, bytes, and the file
+// descriptors those operations are holding open. Whichever is reached first
+// starts evicting, so a service that runs out of descriptors while well under
+// the other two has no way to say so without this one.
+void vipsx_cache_set_max_files(int max) { vips_cache_set_max_files(max); }
+
+int vipsx_cache_get_max_files(void) { return vips_cache_get_max_files(); }
+
+size_t vipsx_cache_get_max_mem(void) { return vips_cache_get_max_mem(); }
+
 // Drain the operation cache.
 //
 // Not vips_cache_drop_all: in libvips 8.18 that destroys the cache hash table
