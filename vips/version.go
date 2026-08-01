@@ -12,10 +12,10 @@ import "runtime/debug"
 //
 // Version reports the libvips this is linked against, which is a different
 // question and usually the more interesting one.
-const PackageVersion = "0.5.0"
+const PackageVersion = "0.5.1"
 
 // ModuleVersion reports the version the calling program actually resolved from
-// the module graph, such as "v0.5.0".
+// the module graph, such as "v0.5.1".
 //
 // This is the honest answer where PackageVersion is only the intended one: a
 // consumer pinned to an older release, or to a commit between releases, gets
