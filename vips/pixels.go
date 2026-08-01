@@ -130,3 +130,47 @@ func (im *Image) CopyMemory() (*Image, error) {
 	}
 	return wrapImage(unsafe.Pointer(out)), nil
 }
+
+// WithPixels lends the image's own pixel buffer to fn, without copying it.
+//
+// WriteToMemory allocates a copy and hands it over; this renders into the
+// image's buffer and lets fn look at it in place. On a large image that is a
+// whole memcpy saved, which is the only reason to prefer it.
+//
+// The slice belongs to the image and is valid only until fn returns. It must
+// not escape: keeping it, appending it to something outlasting the call, or
+// handing it to a goroutine that outlives fn all leave a slice pointing into
+// memory the image may have released. Copy what is needed instead.
+//
+//	var sum uint64
+//	err := im.WithPixels(func(p []byte) error {
+//	    for _, b := range p {
+//	        sum += uint64(b)
+//	    }
+//	    return nil
+//	})
+//
+// The callback shape is the API this deserves rather than the API libvips has.
+// vips_image_get_data returns the pointer, and a Go function returning a []byte
+// over it would be handing out a use-after-free waiting for someone to Close
+// the image.
+func (im *Image) WithPixels(fn func([]byte) error) error {
+	if fn == nil {
+		return &Error{Op: "get_data", Message: "nil callback"}
+	}
+	p := im.live("WithPixels")
+	defer runtime.KeepAlive(im)
+
+	data := C.vipsx_image_get_data(p)
+	if data == nil {
+		return &Error{Op: "get_data", Message: lastError()}
+	}
+
+	n := im.Width() * im.Height() * im.Bands() * FormatSizeof(im.Format())
+	if n <= 0 {
+		return &Error{Op: "get_data", Message: "the image has no pixels"}
+	}
+	// unsafe.Slice over C memory: the image holds it, and KeepAlive above holds
+	// the image for the length of the call.
+	return fn(unsafe.Slice((*byte)(data), n))
+}
