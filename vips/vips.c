@@ -38,3 +38,9 @@ char *vipsx_error_buffer_copy(void) {
 void vipsx_concurrency_set(int n) { vips_concurrency_set(n); }
 
 int vipsx_concurrency_get(void) { return vips_concurrency_get(); }
+
+// libvips hangs thread-local state off every thread that calls into it, and
+// releases it here. Nothing else does: the state outlives the thread.
+void vipsx_thread_shutdown(void) { vips_thread_shutdown(); }
+
+void vipsx_leak_set(int leak) { vips_leak_set(leak); }

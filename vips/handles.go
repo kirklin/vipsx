@@ -244,6 +244,22 @@ func SetCacheMax(n int) { C.vipsx_cache_set_max(C.int(n)) }
 // SetCacheMaxMem bounds the operation cache by bytes rather than by count.
 func SetCacheMaxMem(bytes uint64) { C.vipsx_cache_set_max_mem(C.size_t(bytes)) }
 
+// SetCacheMaxFiles bounds the operation cache by how many file descriptors the
+// cached operations are holding open.
+//
+// This is the third of the cache's three limits, and the one most likely to be
+// hit without warning: a process well under both the operation count and the
+// byte ceiling can still run out of descriptors, because a cached loader keeps
+// its file open. The symptom is unrelated parts of the program failing to open
+// anything.
+func SetCacheMaxFiles(n int) { C.vipsx_cache_set_max_files(C.int(n)) }
+
+// CacheMaxFiles reports the descriptor limit.
+func CacheMaxFiles() int { return int(C.vipsx_cache_get_max_files()) }
+
+// CacheMaxMem reports the byte limit.
+func CacheMaxMem() uint64 { return uint64(C.vipsx_cache_get_max_mem()) }
+
 // CacheMax reports the current operation limit.
 func CacheMax() int { return int(C.vipsx_cache_get_max()) }
 
